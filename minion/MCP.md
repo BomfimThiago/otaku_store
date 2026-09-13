@@ -53,12 +53,20 @@ Keys needed from the human:
 
 ## Status
 
-| Server | Registered (`.mcp.json`) | Key present | API verified |
+| Server | Registered (`.mcp.json`) | Key valid (direct API) | Live MCP tool call |
 |---|---|---|---|
-| Tavily | ✅ | ✅ `TAVILY_API_KEY` | ✅ HTTP 200 |
-| Context7 | ✅ | ✅ `CONTEXT7_API_KEY` | ✅ HTTP 200 |
-| GitHub | ✅ | ✅ `GITHUB_TOKEN` (`repo`, `workflow`, …) | ✅ HTTP 200 (user `BomfimThiago`, repo access ok) |
-| Playwright | ✅ | n/a | ✅ package resolves |
+| Tavily | ✅ | ✅ HTTP 200 | ✅ `tavily_search` returned live results |
+| Context7 | ✅ | ✅ HTTP 200 | ✅ `resolve-library-id` returned results (keyless) |
+| GitHub | ✅ | ✅ HTTP 200 (user `BomfimThiago`, repo access ok) | ✅ `get_me` authenticated as `BomfimThiago` |
+| Playwright | ✅ | n/a | ✅ connected (keyless) |
+
+All four verified live from an env-loaded session (`set -a; source .env; set +a; claude`).
+
+**Key/env gotcha (verified):** `.mcp.json` expands `${VAR}` from the **`claude` process
+environment** at server spawn time — it does not read `.env` on its own. A session started
+without the secrets loaded passes an empty key, so Tavily/GitHub tool calls fail with
+`Unauthorized` even though the keys are valid (confirmed: keyless Context7 worked in the same
+session while Tavily returned 401). Keyless servers (Context7, Playwright) are unaffected.
 
 npm packages resolved: `tavily-mcp@0.2.22`, `@upstash/context7-mcp@4.1.0`, `@playwright/mcp@0.0.80`.
 
