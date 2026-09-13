@@ -87,6 +87,14 @@ export class Scheduler {
     return grantedNow;
   }
 
+  /** Would `acquire` succeed right now? A read-only check that never queues. */
+  canAcquire(runId: string, files: string[]): boolean {
+    return files.every((f) => {
+      const held = this.locks.get(f);
+      return held === undefined || held.runId === runId;
+    });
+  }
+
   /** Serializable view for `locks.json` and the dashboard (SPEC §9.2). */
   snapshot(): LockTable {
     const locks: FileLock[] = [...this.locks].map(([file, h]) => ({
