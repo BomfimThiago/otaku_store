@@ -1,0 +1,585 @@
+<title>Minion Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#18100a;
+    --sidebar:#150e08;
+    --surface:#1F1710;
+    --surface-2:#291F16;
+    --line:#3A2E20;
+    --ink:#F1E9DB;
+    --muted:#9C8F79;
+    --dim:#6C6252;
+
+    --accent:#E2843F;       /* agent node / judgment */
+    --accent-soft:#3D2A18;
+    --verify:#4FB894;       /* deterministic node / pass */
+    --verify-soft:#16302A;
+    --judge:#9C93E8;        /* judge node / evaluation */
+    --judge-soft:#28253F;
+    --fail:#E2585A;
+    --fail-soft:#3A1E1E;
+    --pending:#544A3B;
+  }
+
+  *{ box-sizing:border-box; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    font-size:14px;
+  }
+  code, .mono{ font-family:'IBM Plex Mono', ui-monospace, monospace; }
+
+  .app{
+    display:grid;
+    grid-template-columns: 258px 1fr;
+    min-height:100vh;
+  }
+  @media (max-width:760px){
+    .app{ grid-template-columns: 1fr; }
+  }
+
+  /* ---------------- topbar ---------------- */
+  .topbar{
+    grid-column:1/-1;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px;
+    border-bottom:1px solid var(--line);
+    background:var(--sidebar);
+  }
+  .brand{ display:flex; align-items:center; gap:9px; font-weight:600; letter-spacing:0.01em; }
+  .brand .dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .brand small{ color:var(--dim); font-weight:400; font-family:'IBM Plex Mono', monospace; font-size:0.72rem; }
+  .topbar .stats{ display:flex; gap:22px; font-family:'IBM Plex Mono', monospace; font-size:0.76rem; color:var(--muted); }
+  .topbar .stats b{ color:var(--ink); font-weight:600; }
+  @media (max-width:760px){ .topbar .stats{ display:none; } }
+
+  /* ---------------- sidebar ---------------- */
+  .sidebar{
+    background:var(--sidebar);
+    border-right:1px solid var(--line);
+    padding:16px 12px;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  @media (max-width:760px){
+    .sidebar{
+      display:flex; flex-direction:row; overflow-x:auto;
+      border-right:none; border-bottom:1px solid var(--line);
+      padding:12px;
+    }
+  }
+  .sidebar .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:0.68rem; letter-spacing:0.1em;
+    color:var(--dim); text-transform:uppercase; padding:4px 8px 8px;
+  }
+  @media (max-width:760px){ .sidebar .eyebrow{ display:none; } }
+
+  .run-card{
+    display:flex; flex-direction:column; gap:6px;
+    padding:11px 12px;
+    border-radius:9px;
+    border:1px solid transparent;
+    cursor:pointer;
+    min-width:200px;
+    flex-shrink:0;
+  }
+  .run-card.active{ background:var(--surface); border-color:var(--line); }
+  .run-card .repo{ font-family:'IBM Plex Mono', monospace; font-size:0.68rem; color:var(--dim); }
+  .run-card .task{ font-size:0.85rem; line-height:1.35; color:var(--ink); }
+  .run-card .status{
+    display:inline-flex; align-items:center; gap:5px;
+    font-family:'IBM Plex Mono', monospace; font-size:0.68rem; font-weight:600;
+    padding:2px 0;
+  }
+  .run-card .status i{ width:6px; height:6px; border-radius:50%; }
+  .status.running i{ background:var(--accent); animation:pulse 1.4s infinite; }
+  .status.running{ color:var(--accent); }
+  .status.done i{ background:var(--verify); }
+  .status.done{ color:var(--verify); }
+  .status.queued i{ background:var(--pending); }
+  .status.queued{ color:var(--dim); }
+  .status.blocked i{ background:var(--pending); border-radius:2px; }
+  .status.blocked{ color:var(--dim); }
+  .run-card .lockinfo{
+    font-family:'IBM Plex Mono', monospace; font-size:0.66rem; color:var(--dim);
+    background:var(--surface-2); border-radius:5px; padding:3px 7px; margin-top:1px;
+  }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
+
+  /* ---------------- main ---------------- */
+  main{ padding:22px 26px 44px; overflow-x:hidden; }
+  .run-header{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;
+    margin-bottom:20px;
+  }
+  .run-header h1{ font-size:1.15rem; font-weight:600; margin:0 0 5px; text-wrap:balance; }
+  .run-header .meta{
+    font-family:'IBM Plex Mono', monospace; font-size:0.74rem; color:var(--dim);
+    display:flex; gap:14px; flex-wrap:wrap;
+  }
+  .run-header .meta span b{ color:var(--muted); }
+
+  .btnrow{ display:flex; gap:10px; }
+  .btn{
+    font-family:'IBM Plex Sans', sans-serif; font-size:0.82rem; font-weight:600;
+    padding:8px 14px; border-radius:7px; border:1px solid var(--line);
+    background:var(--surface); color:var(--muted); cursor:default;
+  }
+  .btn.primary{ background:var(--dim); color:var(--bg); border-color:var(--dim); opacity:0.45; }
+
+  .statrow{
+    display:flex; gap:22px; flex-wrap:wrap;
+    padding:14px 16px; margin-bottom:26px;
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+  }
+  .stat{ display:flex; flex-direction:column; gap:2px; }
+  .stat .n{ font-family:'IBM Plex Mono', monospace; font-size:1.02rem; font-weight:600; font-variant-numeric:tabular-nums; }
+  .stat .l{ font-size:0.66rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--dim); }
+  .stat.warn .n{ color:var(--accent); }
+  .stat.bad .n{ color:var(--fail); }
+
+  /* ---------------- scheduler / lock panel ---------------- */
+  .lockpanel{
+    padding:12px 16px; margin-bottom:20px;
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+  }
+  .lockpanel-head{
+    font-size:0.68rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--dim); font-weight:600;
+    margin-bottom:8px;
+  }
+  .lockrow{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    font-size:0.82rem; padding:6px 0;
+  }
+  .lockrow .lf{ font-family:'IBM Plex Mono', monospace; color:var(--ink); background:var(--surface-2); padding:2px 7px; border-radius:5px; font-size:0.76rem; }
+  .lockrow .lh{ color:var(--muted); }
+  .lockrow .lh b{ color:var(--accent); font-weight:600; }
+  .lockrow .lq{ margin-left:auto; font-family:'IBM Plex Mono', monospace; font-size:0.7rem; color:var(--dim); }
+
+  /* ---------------- section headers ---------------- */
+  .sec-head{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    margin:0 0 12px;
+  }
+  .sec-head h2{ font-size:0.78rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--dim); font-weight:600; margin:0; }
+  .type-legend{ display:flex; gap:14px; font-size:0.68rem; color:var(--dim); flex-wrap:wrap; }
+  .type-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .type-legend i{ width:9px; height:9px; display:inline-block; border:2px solid; }
+  .type-legend i.det{ border-color:var(--verify); border-radius:2px; }
+  .type-legend i.agent{ border-color:var(--accent); border-radius:50%; }
+  .type-legend i.judge{ border-color:var(--judge); border-radius:2px; transform:rotate(45deg); }
+
+  /* ---------------- vertical pipeline ---------------- */
+  .rail{ position:relative; padding-left:30px; margin-bottom:30px; }
+  .rail::before{
+    content:""; position:absolute; left:10px; top:6px; bottom:6px; width:2px; background:var(--line);
+  }
+  .rstep{ position:relative; margin-bottom:14px; }
+  .rstep::before{
+    content:""; position:absolute; left:-30px; top:14px; width:12px; height:12px; background:var(--bg); z-index:1;
+    border:2px solid var(--pending);
+  }
+  .rstep.det::before{ border-radius:3px; }
+  .rstep.agent::before{ border-radius:50%; }
+  .rstep.judge::before{ border-radius:3px; transform:rotate(45deg); }
+
+  .rstep.done::before{ border-color:var(--verify); background:var(--verify-soft); }
+  .rstep.active::before{ border-color:var(--accent); background:var(--accent-soft); animation:ringv 1.4s infinite; }
+  .rstep.failed::before{ border-color:var(--fail); background:var(--fail-soft); }
+  .rstep.pending::before{ border-color:var(--pending); }
+  @keyframes ringv{ 0%,100%{ box-shadow:0 0 0 0 var(--accent-soft);} 50%{ box-shadow:0 0 0 5px var(--accent-soft);} }
+
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:9px;
+    padding:11px 14px;
+  }
+  .rstep.pending .card{ opacity:0.55; }
+  .card-top{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:2px; }
+  .step-name{ font-weight:600; font-size:0.88rem; }
+  .badge{
+    font-family:'IBM Plex Mono', monospace; font-size:0.6rem; letter-spacing:0.06em; text-transform:uppercase;
+    padding:2px 6px; border-radius:4px; font-weight:600;
+  }
+  .badge.det{ background:var(--verify-soft); color:var(--verify); }
+  .badge.agent{ background:var(--accent-soft); color:var(--accent); }
+  .badge.judge{ background:var(--judge-soft); color:var(--judge); }
+  .badge.model{ background:var(--surface-2); color:var(--muted); text-transform:none; letter-spacing:0; }
+  .badge.cond{ background:var(--surface-2); color:var(--dim); text-transform:none; letter-spacing:0; font-style:italic; }
+
+  .card-status{
+    margin-left:auto; font-family:'IBM Plex Mono', monospace; font-size:0.7rem; font-weight:600; white-space:nowrap;
+  }
+  .rstep.done .card-status{ color:var(--verify); }
+  .rstep.active .card-status{ color:var(--accent); }
+  .rstep.failed .card-status{ color:var(--fail); }
+  .rstep.pending .card-status{ color:var(--dim); }
+
+  .card-sub{ font-size:0.78rem; color:var(--muted); margin-top:3px; }
+  .card-sub b{ color:var(--ink); font-weight:600; }
+
+  /* parallel sub-row */
+  .parallel-row{ display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; }
+  .parallel-item{
+    flex:1; min-width:200px;
+    background:var(--surface-2); border:1px solid var(--line); border-radius:7px; padding:8px 10px;
+  }
+  .parallel-item .pt{ font-size:0.78rem; font-weight:600; margin-bottom:2px; }
+  .parallel-item .ps{ font-family:'IBM Plex Mono', monospace; font-size:0.66rem; color:var(--verify); }
+  .parallel-tag{
+    display:inline-block; margin-top:8px; font-family:'IBM Plex Mono', monospace; font-size:0.64rem;
+    color:var(--dim); letter-spacing:0.04em;
+  }
+
+  /* loop-back banner */
+  .loopback{
+    position:relative; margin:-2px 0 14px 0;
+    border:1px dashed var(--fail); border-radius:8px;
+    background:var(--fail-soft); color:#F0B7B7;
+    padding:9px 14px; font-size:0.8rem; display:flex; gap:9px; align-items:flex-start;
+  }
+  .loopback .ic{ font-family:'IBM Plex Mono', monospace; font-weight:700; }
+  .loopback b{ color:#fff; }
+
+  /* ---------------- panels ---------------- */
+  .panels{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+  @media (max-width:900px){ .panels{ grid-template-columns:1fr; } }
+
+  .panel{ background:var(--surface); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; border-bottom:1px solid var(--line);
+    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--dim); font-weight:600;
+  }
+  .panel-head .live{ display:flex; align-items:center; gap:6px; color:var(--accent); text-transform:none; letter-spacing:0; font-family:'IBM Plex Mono', monospace; }
+  .panel-head .live i{ width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 1.4s infinite; }
+  .panel-head .tag{ text-transform:none; letter-spacing:0; font-family:'IBM Plex Mono', monospace; color:var(--fail); }
+
+  .log{
+    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; line-height:1.75;
+    padding:14px; max-height:280px; overflow-y:auto;
+  }
+  .log .t{ color:var(--dim); margin-right:8px; }
+  .log .who{ color:var(--accent); }
+  .log .jg{ color:var(--judge); }
+  .log .ok{ color:var(--verify); }
+  .log .bad{ color:var(--fail); }
+  .log .cur::after{ content:"▌"; animation:pulse 1s infinite; color:var(--accent); }
+
+  /* judge verdict panel */
+  .verdict{ padding:14px; }
+  .vscore{ display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
+  .vscore .num{ font-family:'IBM Plex Mono', monospace; font-size:1.6rem; font-weight:700; color:var(--fail); font-variant-numeric:tabular-nums; }
+  .vscore .of{ font-family:'IBM Plex Mono', monospace; font-size:0.8rem; color:var(--dim); }
+  .vscore .verdict-tag{
+    margin-left:auto; font-family:'IBM Plex Mono', monospace; font-size:0.66rem; text-transform:uppercase;
+    background:var(--fail-soft); color:var(--fail); padding:3px 8px; border-radius:5px; font-weight:700;
+  }
+  .checklist{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+  .cl-item{ display:flex; gap:8px; font-size:0.8rem; align-items:flex-start; }
+  .cl-item .m{ font-weight:700; font-family:'IBM Plex Mono', monospace; }
+  .cl-item.pass .m{ color:var(--verify); }
+  .cl-item.fail .m{ color:var(--fail); }
+  .critique{
+    font-size:0.8rem; color:var(--muted); border-top:1px solid var(--line); padding-top:10px; line-height:1.5;
+  }
+  .critique b{ color:var(--ink); }
+
+  .diffpanel .diff{ font-family:'IBM Plex Mono', monospace; font-size:0.78rem; line-height:1.7; }
+  .diffpanel .file{ padding:9px 14px; color:var(--muted); border-bottom:1px solid var(--line); font-size:0.74rem; }
+  .diffpanel pre{ margin:0; padding:12px 14px; overflow-x:auto; white-space:pre; }
+  .diffpanel .rm{ background:var(--fail-soft); color:#F0B7B7; display:block; }
+  .diffpanel .ad{ background:var(--verify-soft); color:#BFE9DA; display:block; }
+  .diffpanel .ctx{ color:var(--dim); display:block; }
+
+  footer.note{ margin-top:22px; font-size:0.78rem; color:var(--dim); font-style:italic; }
+</style>
+
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>minion console <small>local · v0.2</small></div>
+    <div class="stats">
+      <span>runs ativos <b>2</b></span>
+      <span>bloqueados por lock <b>1</b></span>
+      <span>hoje <b>11</b> tarefas concluídas</span>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="eyebrow">Runs</div>
+
+    <div class="run-card active">
+      <div class="repo">pricing-service</div>
+      <div class="task">corrige test_calculate_discount que está falhando</div>
+      <div class="status running"><i></i>implementação · tentativa 2/2</div>
+    </div>
+
+    <div class="run-card">
+      <div class="repo">auth-service</div>
+      <div class="task">adiciona validação de e-mail no cadastro</div>
+      <div class="status done"><i></i>pronto p/ revisão</div>
+    </div>
+
+    <div class="run-card">
+      <div class="repo">notifications-worker</div>
+      <div class="task">atualiza dependência do logger para v3</div>
+      <div class="status running"><i></i>implementando · sem conflito</div>
+    </div>
+
+    <div class="run-card">
+      <div class="repo">pricing-service</div>
+      <div class="task">atualiza cálculo de imposto p/ nova alíquota</div>
+      <div class="status blocked"><i></i>bloqueado por lock</div>
+      <div class="lockinfo">aguardando src/pricing.py</div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="run-header">
+      <div>
+        <h1>corrige test_calculate_discount que está falhando</h1>
+        <div class="meta">
+          <span>repo <b>pricing-service</b></span>
+          <span>worktree <b>wt-4f21a</b></span>
+          <span>iniciado às <b>14:02:07</b></span>
+        </div>
+      </div>
+      <div class="btnrow">
+        <button class="btn">ver worktree</button>
+        <button class="btn primary">aprovar diff</button>
+      </div>
+    </div>
+
+    <div class="statrow">
+      <div class="stat warn"><span class="n">00:41</span><span class="l">tempo decorrido</span></div>
+      <div class="stat bad"><span class="n">1/2</span><span class="l">reprovações do judge</span></div>
+      <div class="stat"><span class="n">6</span><span class="l">chamadas de modelo · 2 fortes</span></div>
+      <div class="stat"><span class="n">14.9k</span><span class="l">tokens usados</span></div>
+    </div>
+
+    <div class="lockpanel">
+      <div class="lockpanel-head">Agendador · locks ativos</div>
+      <div class="lockrow">
+        <span class="lf">src/pricing.py</span>
+        <span class="lh">preso por <b>este run</b> desde 14:02:08</span>
+        <span class="lq">1 run na fila atrás</span>
+      </div>
+    </div>
+
+    <div class="sec-head">
+      <h2>Blueprint do run</h2>
+      <div class="type-legend">
+        <span><i class="det"></i>determinístico</span>
+        <span><i class="agent"></i>agente</span>
+        <span><i class="judge"></i>judge</span>
+      </div>
+    </div>
+
+    <div class="rail">
+
+      <div class="rstep det done">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Agendar / lock de arquivos</span>
+            <span class="badge det">det</span>
+            <span class="card-status">✓ 0.1s</span>
+          </div>
+          <div class="card-sub">reservou <b>src/pricing.py</b> — nenhuma colisão com runs em andamento no momento do início</div>
+        </div>
+      </div>
+
+      <div class="rstep det done">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Isolar ambiente</span>
+            <span class="badge det">det</span>
+            <span class="card-status">✓ 0.4s</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rstep agent done">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Coletar contexto</span>
+            <span class="badge agent">agente</span>
+            <span class="badge model">modelo rápido</span>
+            <span class="card-status">✓ 2.8s</span>
+          </div>
+          <div class="parallel-row">
+            <div class="parallel-item">
+              <div class="pt">Código + RAG interno</div>
+              <div class="ps">✓ 6 trechos relevantes recuperados</div>
+            </div>
+            <div class="parallel-item">
+              <div class="pt">Fontes oficiais (Tavily / Context7)</div>
+              <div class="ps">✓ doc da lib de cálculo fiscal, v2.3 (atual)</div>
+            </div>
+          </div>
+          <span class="parallel-tag">∥ subagents rodando em paralelo</span>
+        </div>
+      </div>
+
+      <div class="rstep agent done">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Apresentar plano</span>
+            <span class="badge agent">agente</span>
+            <span class="badge model">modelo forte</span>
+            <span class="card-status">✓ 3.1s</span>
+          </div>
+          <div class="card-sub">3 passos · toca <b>src/pricing.py</b> · nenhuma dependência nova</div>
+        </div>
+      </div>
+
+      <div class="rstep judge done">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Judge · plano</span>
+            <span class="badge judge">judge</span>
+            <span class="badge model">modelo forte</span>
+            <span class="card-status">✓ aprovado · 88/100</span>
+          </div>
+          <div class="card-sub">Ordem de cálculo bate com a doc oficial recuperada. Aprovado de primeira.</div>
+        </div>
+      </div>
+
+      <div class="rstep agent active">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Implementar</span>
+            <span class="badge agent">agente</span>
+            <span class="badge model">modelo rápido</span>
+            <span class="card-status">tentativa 2/2 · rodando…</span>
+          </div>
+          <div class="card-sub">Reescrevendo <b>src/pricing.py</b> considerando a crítica do judge abaixo.</div>
+        </div>
+      </div>
+
+      <div class="loopback">
+        <span class="ic">↩</span>
+        <span><b>Tentativa 1 reprovada</b> pelo Judge de implementação (score 42/100) — motivo e checklist completo no painel à direita. Corrigindo com o feedback antes de seguir.</span>
+      </div>
+
+      <div class="rstep judge pending">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Judge · implementação</span>
+            <span class="badge judge">judge</span>
+            <span class="badge model">modelo forte</span>
+            <span class="card-status">aguardando tentativa 2</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rstep det pending">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Evals estáticos</span>
+            <span class="badge det">det</span>
+            <span class="card-status">—</span>
+          </div>
+          <div class="card-sub">complexidade ciclomática · tamanho do diff</div>
+        </div>
+      </div>
+
+      <div class="rstep det pending">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Lint + testes</span>
+            <span class="badge det">det</span>
+            <span class="card-status">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rstep det pending">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">E2E (Playwright)</span>
+            <span class="badge det">det</span>
+            <span class="badge cond">condicional · só se tocar frontend</span>
+            <span class="card-status">pulado</span>
+          </div>
+          <div class="card-sub">plano não toca arquivos de frontend — nó pulado deterministicamente</div>
+        </div>
+      </div>
+
+      <div class="rstep det pending">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Sincronizar com main</span>
+            <span class="badge det">det</span>
+            <span class="card-status">—</span>
+          </div>
+          <div class="card-sub">rebase automático · se houver conflito: 1 tentativa de resolução via agente + harness completo de novo antes de aceitar</div>
+        </div>
+      </div>
+
+      <div class="rstep det pending">
+        <div class="card">
+          <div class="card-top">
+            <span class="step-name">Abrir PR</span>
+            <span class="badge det">det</span>
+            <span class="card-status">—</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-head">log de execução <span class="live"><i></i>ao vivo</span></div>
+        <div class="log">
+          <div><span class="t">14:02:30</span><span class="who">agent&gt;</span> plano aprovado, iniciando implementação</div>
+          <div><span class="t">14:02:33</span><span class="who">agent&gt;</span> editando src/pricing.py (tentativa 1)</div>
+          <div><span class="t">14:02:36</span><span class="jg">judge&gt;</span> avaliando diff contra o plano aprovado</div>
+          <div><span class="t">14:02:39</span><span class="bad">✕ REPROVADO</span> score 42/100 — ordem de cálculo diverge do plano</div>
+          <div><span class="t">14:02:40</span><span class="who">agent&gt;</span> recebendo crítica do judge, ajustando abordagem</div>
+          <div><span class="t">14:02:41</span><span class="who">agent&gt;</span> editando src/pricing.py (tentativa 2)</div>
+          <div><span class="t">14:02:44</span><span class="who cur">escrevendo</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">judge · implementação <span class="tag">tentativa 1 · reprovado</span></div>
+        <div class="verdict">
+          <div class="vscore">
+            <span class="num">42</span><span class="of">/ 100</span>
+            <span class="verdict-tag">reprovado</span>
+          </div>
+          <div class="checklist">
+            <div class="cl-item pass"><span class="m">✓</span><span>Toca só o arquivo previsto no plano (src/pricing.py)</span></div>
+            <div class="cl-item fail"><span class="m">✕</span><span>Ordem de operações diverge do passo 3 do plano (aplica desconto antes do imposto)</span></div>
+            <div class="cl-item pass"><span class="m">✓</span><span>Nenhuma dependência nova introduzida</span></div>
+            <div class="cl-item fail"><span class="m">✕</span><span>Não cobre o caso de borda "desconto 0%" citado no plano</span></div>
+          </div>
+          <div class="critique">
+            <b>Crítica enviada de volta ao agente:</b> reimplementar seguindo a ordem de cálculo do passo 3 (imposto sobre o preço já descontado) e adicionar o caso de desconto 0%.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel diffpanel" style="margin-bottom:16px;">
+      <div class="panel-head">diff · src/pricing.py <span class="live"><i></i>tentativa 2 em andamento</span></div>
+      <div class="diff">
+        <div class="file">1 arquivo alterado</div>
+        <pre><span class="ctx">  def calculate_discount(price, discount, tax_rate):</span>
+<span class="rm">-     total = apply_tax(price, tax_rate) * (1 - discount)</span>
+<span class="ad">+     total = apply_tax(price * (1 - discount), tax_rate)</span>
+<span class="ad">+     if discount == 0:</span>
+<span class="ad">+         return round(apply_tax(price, tax_rate), 2)</span>
+<span class="ctx">      return round(total, 2)</span></pre>
+      </div>
+    </div>
+
+    <footer class="note">
+      Mockup ilustrativo — dados de exemplo. O botão "aprovar diff" só ativa quando o pipeline chega em "Abrir PR"; até lá, toda correção passa pelo teto de 2 tentativas por etapa antes de escalar para revisão humana.
+    </footer>
+  </main>
+
+</div>
