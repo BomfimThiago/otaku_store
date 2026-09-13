@@ -14,4 +14,4 @@ export {
   type VerdictOutput,
 } from "./parse.js";
 export { FakeAgentRunner, jsonReply, type FakeHandler } from "./fake.js";
-export { SdkAgentRunner, type SdkRunnerOptions } from "./sdk-runner.js";
+export { SdkAgentRunner, loadMcpServers, type SdkRunnerOptions } from "./sdk-runner.js";
