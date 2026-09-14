@@ -42,7 +42,15 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<LoadedCon
   const repoRoot = await detectRepoRoot(cwd);
   const base = defaultConfig(repoRoot);
   const file = path.join(repoRoot, "minion.config.json");
-  if (!existsSync(file)) return { config: base, repoRoot, source: "default" };
+
+  // MINION_REPO_SOURCE overrides where runs clone from (e.g. an HTTPS-with-token
+  // URL on a server that has no SSH key). Applied to both file and default config.
+  const applyEnv = (c: MinionConfig): MinionConfig => {
+    const src = process.env.MINION_REPO_SOURCE;
+    return src ? { ...c, repo: { ...c.repo, source: src } } : c;
+  };
+
+  if (!existsSync(file)) return { config: applyEnv(base), repoRoot, source: "default" };
 
   const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<MinionConfig>;
   const config: MinionConfig = {
@@ -51,5 +59,5 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<LoadedCon
     repo: { ...base.repo, ...(parsed.repo ?? {}) },
     commands: { ...base.commands, ...(parsed.commands ?? {}) },
   };
-  return { config, repoRoot, source: "file" };
+  return { config: applyEnv(config), repoRoot, source: "file" };
 }

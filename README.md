@@ -131,7 +131,15 @@ the auth session cookie (an insecure dev fallback is used when unset).
   On [dashboard.render.com](https://dashboard.render.com): **New → Blueprint →**
   connect this repo **→ Apply**. Render builds and serves the single Node service
   and returns a public URL (free tier sleeps after ~15 min, wakes in ~30 s).
-- **Store → tunnel (instant):** `cloudflared tunnel --url http://localhost:3000`.
+- **Console + store → VPS (live trigger):** to let anyone run the Minion from a
+  URL, host it on a small always-on box (e.g. a Hetzner CX22, ~4 GB). Create the
+  box, put the keys in `.env`, and run [`deploy/vps-setup.sh`](deploy/vps-setup.sh):
+  it installs node/git/gh, authenticates, drops the heavy Playwright MCP, and runs
+  the store (`:3000`) and the console with `--enable-trigger` (`:8787`) as
+  auto-restarting systemd services. Guards: set a **low spending cap** on
+  `ANTHROPIC_API_KEY`, and an optional `TRIGGER_TOKEN` (the console URL then needs
+  `?token=…`) plus the built-in one-run-at-a-time + per-process cap.
+- **Store → tunnel (instant, ephemeral):** `cloudflared tunnel --url http://localhost:3000`.
 
 ## Harness / feedback loops
 

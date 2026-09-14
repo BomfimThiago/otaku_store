@@ -76,6 +76,11 @@ async function handle(
     return;
   }
 
+  if (p === "/api/config") {
+    sendJson(res, 200, { trigger: opts.projectDir !== undefined });
+    return;
+  }
+
   if (p === "/api/trigger") {
     await handleTrigger(req, res, opts);
     return;
@@ -124,11 +129,17 @@ async function handleTrigger(
     return;
   }
 
-  let body: { issue?: unknown };
+  let body: { issue?: unknown; token?: unknown };
   try {
-    body = JSON.parse(await readBody(req)) as { issue?: unknown };
+    body = JSON.parse(await readBody(req)) as { issue?: unknown; token?: unknown };
   } catch {
     sendJson(res, 400, { error: "corpo inválido (JSON esperado)" });
+    return;
+  }
+  // Optional access token (abuse guard on a public URL) — enforced only if set.
+  const requiredToken = process.env.TRIGGER_TOKEN;
+  if (requiredToken && body.token !== requiredToken) {
+    sendJson(res, 401, { error: "token de acesso inválido ou ausente" });
     return;
   }
   const issue = Number(body.issue);

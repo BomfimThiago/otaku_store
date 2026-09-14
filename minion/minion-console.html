@@ -343,7 +343,7 @@
   </div>
 
   <aside class="sidebar">
-    <div class="eyebrow">Pedir ao Minion</div>
+    <div class="eyebrow" id="trigger-eyebrow">Pedir ao Minion</div>
     <form id="triggerform" class="trigger">
       <label for="issueinput">Implementar uma issue do GitHub</label>
       <div class="trigger-row">
@@ -621,7 +621,7 @@
         const r = await fetch("/api/trigger", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ issue }),
+          body: JSON.stringify({ issue, token: new URLSearchParams(location.search).get("token") || undefined }),
         });
         const data = await r.json().catch(() => ({}));
         if (r.ok) {
@@ -643,7 +643,15 @@
 
   async function boot() {
     try { blueprint = (await getJson("/api/blueprint")).nodes ?? []; } catch { blueprint = []; }
-    wireTrigger();
+    let cfg = { trigger: true };
+    try { cfg = await getJson("/api/config"); } catch { /* older server — assume on */ }
+    if (cfg.trigger) {
+      wireTrigger();
+    } else {
+      // read-only deploy: hide the trigger panel so nobody hits a disabled endpoint
+      document.getElementById("triggerform")?.remove();
+      document.getElementById("trigger-eyebrow")?.remove();
+    }
     await tick();
     setInterval(tick, 1000);
   }
