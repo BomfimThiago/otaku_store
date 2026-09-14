@@ -10,10 +10,15 @@ points to both.
   decisions, and the Definition of Done. **This is the primary engineering spec.**
 
 - **Product spec of the demo target (what the harness builds):
-  [`store/STORE_SPEC.md`](../store/STORE_SPEC.md)** — OtakuVerso, an otaku
-  e-commerce store: catalog, domain model, business rules, pages/menus, tech
-  stack (Fastify/Prisma/Postgres, React/Vite/Tailwind, Vitest/Playwright, Docker
-  Postgres + MailHog), and a chronological, TDD-first backlog (~50 items).
+  [`store/MVP_SPEC.md`](../store/MVP_SPEC.md)** — OtakuVerso, an otaku e-commerce
+  store, **shipped as a self-contained MVP**: one Fastify service serves the REST
+  API + the built React (Vite + Tailwind) SPA, with all data in-memory
+  (catalog / cart / users / reviews) — no Docker, Postgres, or Prisma. The
+  broader ambition spec ([`store/STORE_SPEC.md`](../store/STORE_SPEC.md) —
+  Postgres/Prisma/MailHog, ~50 items) was deliberately descoped to this MVP to
+  ship in the available time (a human tradeoff; see AI-DEV-LOG). Every feature was
+  built by the Minion, TDD-first — one PR per feature (#1–#6) plus a
+  live-triggered PR (#11).
 
 ## Objective (one paragraph)
 
