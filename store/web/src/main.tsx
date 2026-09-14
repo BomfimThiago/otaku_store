@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 
 import { App } from './App.js';
+import { AuthProvider } from './auth/AuthContext.js';
 import { CartProvider } from './cart/CartContext.js';
 import { ToastProvider } from './toast/ToastProvider.js';
 import './index.css';
@@ -16,9 +17,11 @@ createRoot(container).render(
   <StrictMode>
     <BrowserRouter>
       <ToastProvider>
-        <CartProvider>
-          <App />
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <App />
+          </CartProvider>
+        </AuthProvider>
       </ToastProvider>
     </BrowserRouter>
   </StrictMode>,
