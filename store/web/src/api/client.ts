@@ -2,10 +2,13 @@ import type {
   AddToCartInput,
   ApiErrorBody,
   Cart,
+  CreateReviewInput,
   LoginInput,
   Product,
   ProductListParams,
   RegisterInput,
+  Review,
+  ReviewsResponse,
   UpdateCartItemInput,
   User,
 } from './types.js';
@@ -124,4 +127,15 @@ export function logout(): Promise<void> {
 
 export function me(): Promise<User> {
   return request<User>('/api/auth/me');
+}
+
+export function listReviews(slug: string): Promise<ReviewsResponse> {
+  return request<ReviewsResponse>(`/api/products/${encodeURIComponent(slug)}/reviews`);
+}
+
+export function createReview(slug: string, input: CreateReviewInput): Promise<Review> {
+  return request<Review>(`/api/products/${encodeURIComponent(slug)}/reviews`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }

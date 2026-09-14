@@ -12,6 +12,8 @@ export interface Product {
   priceCents: Cents;
   images: string[];
   stock: number;
+  ratingAverage?: number;
+  ratingCount?: number;
 }
 
 export interface ProductListParams {
@@ -71,4 +73,25 @@ export interface RegisterInput {
 export interface LoginInput {
   email: string;
   password: string;
+}
+
+export interface Review {
+  id: string;
+  productSlug: string;
+  userId: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+export interface ReviewsResponse {
+  reviews: Review[];
+  average: number;
+  count: number;
+}
+
+export interface CreateReviewInput {
+  rating: number;
+  comment: string;
 }

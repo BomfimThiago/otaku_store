@@ -11,6 +11,9 @@ import healthRoute from './routes/health.js';
 import productsRoute from './routes/products.js';
 import cartRoute from './routes/cart.js';
 import authRoute from './routes/auth.js';
+import reviewsRoute from './routes/reviews.js';
+import { createUsersStore } from './data/users.js';
+import { createReviewsStore } from './data/reviews.js';
 
 /** The built SPA to serve (present in production; absent in unit tests). */
 const SPA_DIST = join(dirname(fileURLToPath(import.meta.url)), '../../web/dist');
@@ -26,9 +29,16 @@ export function buildApp(opts: FastifyServerOptions = {}) {
   // routes outside /api when a build is present, and JSON 404 otherwise.
   app.register(errorsPlugin, { spaDist: SPA_DIST });
   app.register(healthRoute);
-  app.register(productsRoute);
+
+  // Built here (rather than at module scope) so each buildApp() gets its own
+  // in-memory state, keeping tests isolated from one another.
+  const usersStore = createUsersStore();
+  const reviewsStore = createReviewsStore();
+
+  app.register(productsRoute, { reviewsStore });
   app.register(cartRoute);
-  app.register(authRoute);
+  app.register(authRoute, { usersStore });
+  app.register(reviewsRoute, { usersStore, reviewsStore });
 
   // Hashed JS/CSS assets; SPA routes (/, /p/:slug, /cart, /login, /register)
   // fall through to the not-found handler, which returns index.html.

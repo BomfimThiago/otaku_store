@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router';
 import { getProduct } from '../api/client.js';
 import type { Product } from '../api/types.js';
 import { ProductImage } from '../components/ProductImage.js';
+import { ReviewsSection } from '../components/ReviewsSection.js';
 import { useCart } from '../cart/CartContext.js';
 import { useToast } from '../toast/ToastProvider.js';
 import { formatPrice } from '../lib/format.js';
@@ -158,6 +159,8 @@ export function ProductPage() {
           </aside>
         </div>
       </div>
+
+      <ReviewsSection slug={product.slug} />
     </main>
   );
 }

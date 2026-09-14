@@ -50,6 +50,9 @@ function mockFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respon
   const url = typeof input === 'string' ? input : input.toString();
   const method = init?.method ?? 'GET';
 
+  if (url.includes('/reviews')) {
+    return Promise.resolve(jsonResponse({ reviews: [], average: 0, count: 0 }));
+  }
   if (url.startsWith('/api/products/katana-x')) {
     return Promise.resolve(jsonResponse(katanaProduct));
   }

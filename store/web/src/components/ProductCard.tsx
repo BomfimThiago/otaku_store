@@ -5,6 +5,7 @@ import { useCart } from '../cart/CartContext.js';
 import { formatPrice } from '../lib/format.js';
 import { useToast } from '../toast/ToastProvider.js';
 import { ProductImage } from './ProductImage.js';
+import { Stars } from './Stars.js';
 
 export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
@@ -39,6 +40,9 @@ export function ProductCard({ product }: { product: Product }) {
 
       <div className="flex flex-1 flex-col px-3 pb-3">
         <p className="mt-2 text-lg font-bold text-neon-pink">{formatPrice(product.priceCents)}</p>
+        {typeof product.ratingCount === 'number' && (
+          <Stars value={product.ratingAverage ?? 0} count={product.ratingCount} size="sm" />
+        )}
         <p className={`mt-1 text-xs ${inStock ? 'text-neon-lime' : 'text-muted'}`}>
           {inStock ? 'Em estoque' : 'Esgotado'}
         </p>

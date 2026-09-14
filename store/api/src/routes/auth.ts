@@ -1,12 +1,35 @@
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { createUsersStore, PASSWORD_MIN_LENGTH } from '../data/users.js';
+import { PASSWORD_MIN_LENGTH } from '../data/users.js';
+import type { PublicUser, UsersStore } from '../data/users.js';
 
 const COOKIE_NAME = 'sid';
 
 function unauthorized(message: string): Error & { statusCode: number } {
   return Object.assign(new Error(message), { statusCode: 401 });
+}
+
+/**
+ * Resolves the signed `sid` cookie to the logged-in user, throwing the same
+ * 401 error the auth routes use when the cookie is missing, tampered with,
+ * or no longer maps to a session.
+ */
+export function requireUser(req: FastifyRequest, usersStore: UsersStore): PublicUser {
+  const raw = req.cookies[COOKIE_NAME];
+  if (typeof raw !== 'string') throw unauthorized('Not authenticated');
+
+  const unsigned = req.unsignCookie(raw);
+  if (!unsigned.valid) throw unauthorized('Not authenticated');
+
+  const user = usersStore.getUserBySession(unsigned.value);
+  if (!user) throw unauthorized('Not authenticated');
+
+  return user;
+}
+
+export interface AuthRouteOptions {
+  usersStore: UsersStore;
 }
 
 const publicUserSchema = z.object({
@@ -30,10 +53,8 @@ const loginBody = z.object({
   password: z.string().min(1),
 });
 
-const authRoute: FastifyPluginAsyncZod = async (app) => {
-  // Built inside the plugin (rather than at module scope) so each buildApp()
-  // gets its own in-memory state, keeping tests isolated from one another.
-  const usersStore = createUsersStore();
+const authRoute: FastifyPluginAsyncZod<AuthRouteOptions> = async (app, opts) => {
+  const { usersStore } = opts;
 
   function setSidCookie(reply: FastifyReply, sid: string): void {
     reply.setCookie(COOKIE_NAME, sid, {
@@ -81,20 +102,8 @@ const authRoute: FastifyPluginAsyncZod = async (app) => {
     return reply.code(204).send();
   });
 
-  app.get('/api/auth/me', { schema: { response: { 200: publicUserSchema } } }, async (req, reply) => {
-    const raw = req.cookies[COOKIE_NAME];
-    if (!raw) throw unauthorized('Not authenticated');
-
-    const unsigned = req.unsignCookie(raw);
-    if (!unsigned.valid) throw unauthorized('Not authenticated');
-
-    const user = usersStore.getUserBySession(unsigned.value);
-    if (!user) throw unauthorized('Not authenticated');
-
-    if (unsigned.renew) {
-      setSidCookie(reply, unsigned.value);
-    }
-    return user;
+  app.get('/api/auth/me', { schema: { response: { 200: publicUserSchema } } }, async (req) => {
+    return requireUser(req, usersStore);
   });
 };
 
