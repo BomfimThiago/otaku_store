@@ -316,6 +316,24 @@
   .trigger-msg{ margin-top:8px; font-size:0.78rem; min-height:1em; color:var(--dim); }
   .trigger-msg.ok{ color:var(--accent); }
   .trigger-msg.err{ color:#ff6b81; }
+
+  .parwrap{ margin-top:9px; }
+  .parhint{ font-size:0.66rem; letter-spacing:0.05em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
+  .parlanes{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .parlane{ display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid rgba(255,255,255,0.10);
+    border-radius:8px; background:rgba(255,255,255,0.03); }
+  .parlane .pl-ico{ font-size:0.95rem; line-height:1; }
+  .parlane .pl-txt{ display:flex; flex-direction:column; line-height:1.2; flex:1; min-width:0; }
+  .parlane .pl-txt b{ font-size:0.8rem; font-weight:600; }
+  .parlane .pl-txt em{ font-size:0.68rem; color:var(--dim); font-style:normal; }
+  .parlane .pl-tag{ font-size:0.66rem; color:var(--dim); white-space:nowrap; }
+  .parlane.run{ border-color:var(--accent); background:rgba(34,228,255,0.06); }
+  .parlane.run .pl-ico, .parlane.run .pl-tag{ color:var(--accent); }
+  .parlane.run .pl-ico{ animation:parpulse 1s ease-in-out infinite; }
+  .parlane.ok .pl-ico{ color:#39d98a; }
+  .parlane.ok .pl-tag{ color:#39d98a; }
+  .parlane.pending{ opacity:0.5; }
+  @keyframes parpulse{ 0%,100%{ opacity:0.3; } 50%{ opacity:1; } }
 </style>
 
 <div class="app">
@@ -436,6 +454,8 @@
       ? `<div class="card-sub">${esc(step.summary)}</div>`
       : (step && step.skippedReason ? `<div class="card-sub">${esc(step.skippedReason)}</div>` : "");
 
+    const parallel = spec.node === "context" ? parallelLanes(step) : "";
+
     return `<div class="rstep ${spec.type} ${status}">
       <div class="card">
         <div class="card-top">
@@ -444,8 +464,27 @@
           <span class="card-status">${statusText}</span>
         </div>
         ${sub}
+        ${parallel}
       </div>
     </div>`;
+  }
+
+  // The context node runs two agents in parallel (Promise.all): internal RAG +
+  // official sources. Surface both lanes so the parallelism is visible.
+  function parallelLanes(step) {
+    const st = step ? step.status : "pending";
+    let ico = "○", cls = "pending", tag = "aguardando";
+    if (st === "active") { ico = "◐"; cls = "run"; tag = "rodando…"; }
+    else if (st === "done") { ico = "✓"; cls = "ok"; tag = "pronto"; }
+    const lane = (title, subtitle) =>
+      `<div class="parlane ${cls}"><span class="pl-ico">${ico}</span>` +
+      `<span class="pl-txt"><b>${title}</b><em>${subtitle}</em></span>` +
+      `<span class="pl-tag">${tag}</span></div>`;
+    return `<div class="parwrap"><div class="parhint">2 pipelines em paralelo</div>` +
+      `<div class="parlanes">` +
+      lane("Busca interna", "código + RAG do repo") +
+      lane("Docs oficiais", "Tavily · Context7") +
+      `</div></div>`;
   }
 
   function renderMain(run) {
