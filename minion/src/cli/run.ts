@@ -114,12 +114,26 @@ async function runSpec(args: ParsedArgs, deps: SpecDeps): Promise<void> {
 
   const runItem = async (item: BacklogItem): Promise<ItemOutcome> => {
     const run = newRunFromItem(item, deps.repoName, deps.config.repo.source);
-    const result = await runWorker(run, deps.store, deps.handlers, itemConfig);
+    // One item's error (e.g. an agent hitting its turn ceiling) must fail only
+    // that item, never crash the whole build.
+    let result: WorkerResult;
+    try {
+      result = await runWorker(run, deps.store, deps.handlers, itemConfig);
+    } catch (err) {
+      console.log(`  [item] ${item.id}: worker error — ${err instanceof Error ? err.message : String(err)}`);
+      run.status = "failed";
+      await deps.store.writeRun(run);
+      return "failed";
+    }
     if (result.status !== "done") return toItemOutcome(result.status);
 
     const merge = mergeChain.then(() => integrator.merge(run.cloneDir, run.branch));
     mergeChain = merge.catch(() => undefined);
-    const merged = await merge;
+    const merged = await merge.catch((err: unknown) => ({
+      ok: false,
+      conflict: false,
+      output: err instanceof Error ? err.message : String(err),
+    }));
     if (!merged.ok) {
       console.log(`  [integrate] ${item.id}: merge ${merged.conflict ? "conflict" : "failed"} — ${truncate(merged.output, 80)}`);
       return merged.conflict ? "escalated" : "failed";

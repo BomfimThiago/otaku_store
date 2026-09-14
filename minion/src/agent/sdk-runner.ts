@@ -59,7 +59,7 @@ export class SdkAgentRunner implements AgentRunner {
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
       settingSources: [],
-      maxTurns: this.options.maxTurns ?? 40,
+      maxTurns: this.options.maxTurns ?? 120,
       ...(def.model !== undefined ? { model: def.model } : {}),
       ...(allowed !== undefined ? { allowedTools: allowed } : {}),
       ...(this.options.mcpServers !== undefined ? { mcpServers: this.options.mcpServers } : {}),
