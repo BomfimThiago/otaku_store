@@ -60,6 +60,14 @@ const workItemBlock = (run: Run): string => `# Work item\n${run.workItem}`;
 const planBlock = (run: Run): string =>
   run.plan === undefined ? "" : `# Approved plan\n${JSON.stringify(run.plan, null, 2)}`;
 
+/** Concise PR title: "Resolve #N: <first clause>" (or the clause alone). */
+function prTitle(run: Run): string {
+  const issue = /issue #(\d+)/i.exec(run.workItem)?.[1];
+  const base = (run.plan?.summary ?? run.workItem).split(/[.(]/)[0]!.trim();
+  const short = base.length > 64 ? `${base.slice(0, 61).trimEnd()}…` : base;
+  return issue ? `Resolve #${issue}: ${short}` : short;
+}
+
 /** Human-readable PR body (markdown) — not the raw plan JSON. */
 function prBody(run: Run): string {
   const plan = run.plan;
@@ -222,7 +230,7 @@ export function createWorkerHandlers(deps: WorkerDeps): NodeHandlers {
         run.cloneDir,
         run.branch,
         deps.config.repo.integrationBranch,
-        run.plan?.summary ?? run.workItem,
+        prTitle(run),
         prBody(run),
       );
       return { kind: "ok", summary: pr.url };
