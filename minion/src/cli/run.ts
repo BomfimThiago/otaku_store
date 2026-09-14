@@ -37,6 +37,7 @@ interface ParsedArgs {
   workItem: string;
   openPr: boolean;
   maxItems?: number;
+  parallelism?: number;
 }
 
 type WorkItemKind = "spec" | "issue" | "task";
@@ -49,7 +50,14 @@ export async function runCommand(argv: string[]): Promise<void> {
     return;
   }
 
-  const { config, repoRoot, source } = await loadConfig();
+  const loaded = await loadConfig();
+  const { repoRoot, source } = loaded;
+  // --parallelism overrides the config (serialize a spec build with 1 to avoid
+  // shared-manifest merge conflicts between concurrent items).
+  const config: MinionConfig =
+    args.parallelism !== undefined
+      ? { ...loaded.config, parallelism: args.parallelism }
+      : loaded.config;
   const kind = detectKind(args.workItem, repoRoot);
   console.log(`repo:   ${repoRoot}`);
   console.log(`config: ${source}`);
@@ -230,6 +238,7 @@ function toItemOutcome(status: WorkerStatus): ItemOutcome {
 function parseArgs(argv: string[]): ParsedArgs {
   let openPr = false;
   let maxItems: number | undefined;
+  let parallelism: number | undefined;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -237,6 +246,9 @@ function parseArgs(argv: string[]): ParsedArgs {
     else if (a === "--max-items") {
       const n = Number.parseInt(argv[++i] ?? "", 10);
       if (Number.isFinite(n) && n > 0) maxItems = n;
+    } else if (a === "--parallelism") {
+      const n = Number.parseInt(argv[++i] ?? "", 10);
+      if (Number.isFinite(n) && n > 0) parallelism = n;
     } else if (a === "--issue") {
       const n = argv[++i];
       if (n !== undefined) rest.push(`Resolve GitHub issue #${n} in this repository.`);
@@ -244,6 +256,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   }
   const parsed: ParsedArgs = { workItem: rest.join(" ").trim(), openPr };
   if (maxItems !== undefined) parsed.maxItems = maxItems;
+  if (parallelism !== undefined) parsed.parallelism = parallelism;
   return parsed;
 }
 

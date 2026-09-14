@@ -1,0 +1,14 @@
+{
+  "repo": {
+    "defaultBranch": "develop",
+    "integrationBranch": "mvp"
+  },
+  "parallelism": 1,
+  "commands": {
+    "lint": "cd store && npm install --no-audit --no-fund --silent && npm run typecheck",
+    "test": "echo 'unit tests are written and run within each item (TDD)'"
+  },
+  "frontendGlobs": ["store/web/**"],
+  "evals": [],
+  "attemptCeiling": 2
+}
