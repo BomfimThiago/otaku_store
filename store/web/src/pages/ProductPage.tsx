@@ -6,6 +6,7 @@ import { ProductImage } from '../components/ProductImage.js';
 import { useCart } from '../cart/CartContext.js';
 import { useToast } from '../toast/ToastProvider.js';
 import { formatPrice } from '../lib/format.js';
+import { categoryLabel } from '../lib/categories.js';
 
 export function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -38,7 +39,7 @@ export function ProductPage() {
 
   if (error) {
     return (
-      <main className="w-full px-4 py-16 text-center sm:px-6 lg:px-8">
+      <main className="w-full px-4 py-16 text-center md:px-8">
         <p className="text-muted">
           Produto não encontrado.{' '}
           <Link to="/" className="text-neon-cyan">
@@ -51,7 +52,7 @@ export function ProductPage() {
 
   if (!product) {
     return (
-      <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
+      <main className="w-full px-4 py-6 md:px-8">
         <div className="h-4 w-24 animate-pulse rounded bg-ink-800" />
         <div className="mt-6 grid gap-8 lg:grid-cols-12">
           <div className="lg:col-span-7 xl:col-span-5">
@@ -82,10 +83,28 @@ export function ProductPage() {
   };
 
   return (
-    <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <Link to="/" className="text-sm text-muted hover:text-fg">
-        ← Catálogo
-      </Link>
+    <main className="w-full px-4 py-6 md:px-8">
+      <nav aria-label="Breadcrumb" className="text-sm text-muted">
+        <ol className="flex flex-wrap items-center gap-1.5">
+          <li>
+            <Link to="/" className="hover:text-fg">
+              Início
+            </Link>
+          </li>
+          <li aria-hidden="true">/</li>
+          <li>
+            <Link to={`/?category=${product.category}`} className="hover:text-fg">
+              {categoryLabel(product.category)}
+            </Link>
+          </li>
+          <li aria-hidden="true">/</li>
+          <li>
+            <span aria-current="page" className="text-fg">
+              {product.name}
+            </span>
+          </li>
+        </ol>
+      </nav>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-12">
         <div className="lg:col-span-7 xl:col-span-5">

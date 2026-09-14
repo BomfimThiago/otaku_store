@@ -8,7 +8,7 @@ export function CartPage() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <main className="w-full px-4 py-10 md:px-8">
         <div className="h-40 animate-pulse rounded-xl bg-ink-800" />
       </main>
     );
@@ -16,7 +16,7 @@ export function CartPage() {
 
   if (items.length === 0) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-16">
+      <main className="w-full px-4 py-16 md:px-8">
         <EmptyState
           title="Seu carrinho está vazio"
           message="Explore o catálogo e adicione seus colecionáveis favoritos."
@@ -31,7 +31,7 @@ export function CartPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <main className="w-full px-4 py-10 md:px-8">
       <h1 className="mb-6 font-display text-2xl font-bold">Carrinho</h1>
       <ul className="space-y-3">
         {items.map((it) => (
