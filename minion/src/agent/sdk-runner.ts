@@ -50,6 +50,16 @@ export class SdkAgentRunner implements AgentRunner {
     let text = "";
     let errorSubtype: string | undefined;
 
+    // Map tier aliases → concrete, currently-valid model IDs. The SDK's bare
+    // "opus"/"sonnet" alias can resolve to a model ID a given API key doesn't
+    // have (→ not_found → the query loops), so we pin real IDs (env-overridable).
+    const modelAliases: Record<string, string> = {
+      opus: process.env.MINION_MODEL_OPUS ?? "claude-opus-4-6",
+      sonnet: process.env.MINION_MODEL_SONNET ?? "claude-sonnet-4-5-20250929",
+      haiku: process.env.MINION_MODEL_HAIKU ?? "claude-haiku-4-5-20251001",
+    };
+    const model = def.model !== undefined ? (modelAliases[def.model] ?? def.model) : undefined;
+
     // Build options omitting undefined keys (exactOptionalPropertyTypes).
     // settingSources: [] so we don't inherit the target repo's own .claude /
     // CLAUDE.md — agent definitions come from the Minion project, set explicitly.
@@ -60,7 +70,7 @@ export class SdkAgentRunner implements AgentRunner {
       allowDangerouslySkipPermissions: true,
       settingSources: [],
       maxTurns: this.options.maxTurns ?? 120,
-      ...(def.model !== undefined ? { model: def.model } : {}),
+      ...(model !== undefined ? { model } : {}),
       ...(allowed !== undefined ? { allowedTools: allowed } : {}),
       ...(this.options.mcpServers !== undefined ? { mcpServers: this.options.mcpServers } : {}),
     };
