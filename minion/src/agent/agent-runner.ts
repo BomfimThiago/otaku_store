@@ -39,12 +39,28 @@ export function extractJson(text: string): unknown {
   }
 }
 
-/** Run an agent and parse its structured output with the given validator. */
+/**
+ * Run an agent and parse its structured output. Structured output is stochastic:
+ * a model occasionally emits a shape the strict validator rejects. Re-asking
+ * almost always yields a well-formed reply, so we retry the whole call a few
+ * times before failing — keeping strict validation without brittle one-offs.
+ */
 export async function runStructured<T>(
   runner: AgentRunner,
   req: AgentRequest,
   parse: (u: unknown) => T,
+  attempts = 3,
 ): Promise<T> {
-  const res = await runner.run(req);
-  return parse(extractJson(res.text));
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    const res = await runner.run(req);
+    try {
+      return parse(extractJson(res.text));
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw new Error(
+    `structured output invalid after ${attempts} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
 }
