@@ -1,7 +1,7 @@
 ---
 name: decompose-spec
 description: Turn a product specification into a backlog of atomic, independently shippable items with acceptance criteria, likely files and declared dependencies.
-when_to_use: Use when decomposing a spec (e.g. STORE_SPEC.md) into the Minion backlog.
+when_to_use: Use when decomposing a spec (e.g. store/STORE_SPEC.md) into the Minion backlog.
 user-invocable: false
 allowed-tools: Read, Grep, Glob
 ---

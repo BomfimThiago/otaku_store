@@ -62,7 +62,7 @@ The final product has two parts:
 | FR15 | Backlog items can declare an explicit dependency on other items (`depends_on: item_id`). |
 | FR16 | The dashboard shows, live: all active/queued/blocked runs, the selected run's blueprint, the log, the Judges' verdicts and the diff. |
 | FR17 | Each agentic/Judge node records which model "tier" was used. |
-| FR18 | The system accepts a product specification document (e.g. `STORE_SPEC.md`) instead of loose tasks. |
+| FR18 | The system accepts a product specification document (e.g. `store/STORE_SPEC.md`) instead of loose tasks. |
 | FR19 | An agent decomposes the specification into a backlog of atomic items, each with a description, acceptance criteria, likely files and declared dependencies relative to other items. |
 | FR20 | A backlog Judge approves or rejects the decomposition, checking full coverage of the specification, adequate item sizing and dependency coherence (same ceiling of 2 attempts before escalating). |
 | FR21 | From the approved backlog, the system builds a dependency graph and computes priority deterministically (number of items unblocked × MVP/nice-to-have weight) — no LLM decides execution order at runtime. |
@@ -100,7 +100,7 @@ Sits **above** the per-backlog-item blueprint (section 5.2) and is what allows f
 system an entire product specification instead of loose items:
 
 ```
-   STORE_SPEC.md (or equivalent spec)
+   store/STORE_SPEC.md (or equivalent spec)
               ▼
    ┌───────────────────────┐
    │  Decompose into backlog│  AGENT (strong model)
@@ -313,7 +313,7 @@ Each criterion below is verifiable — it can be checked as true or false agains
 not just against the documentation.
 
 **Coordination layer (§5.1)**
-- [ ] The system runs end to end from a single product specification (e.g. `STORE_SPEC.md`), with no work item created by hand.
+- [ ] The system runs end to end from a single product specification (e.g. `store/STORE_SPEC.md`), with no work item created by hand.
 - [ ] The backlog Judge confirms the decomposition covers 100% of the specification's mandatory features.
 - [ ] The dispatch loop runs at least 2 independent items in genuine parallel (no dependency or lock between them).
 - [ ] At least 1 item's execution order is governed by a declared dependency (not by an incidental file lock).
@@ -395,10 +395,10 @@ runs/
 ### 9.5 Bootstrapping order
 
 - The Minion is built and validated **first**, against a **small sample repo + sample spec**,
-  so the full pipeline (including the roadmap layer) can be exercised before `STORE_SPEC.md`
+  so the full pipeline (including the roadmap layer) can be exercised before `store/STORE_SPEC.md`
   exists.
 - Only after the Minion works do we point it at the store. DoD criteria that reference
-  `STORE_SPEC.md` are validated in that second phase.
+  `store/STORE_SPEC.md` are validated in that second phase.
 
 ### 9.6 Language / runtime
 
