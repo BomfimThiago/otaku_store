@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { listProducts } from '../api/client.js';
 import type { Product } from '../api/types.js';
 import { ProductCard } from '../components/ProductCard.js';
@@ -7,11 +8,14 @@ import { ErrorState } from '../components/states/ErrorState.js';
 
 const CATEGORIES = ['figures', 'mangas', 'vestuario', 'acessorios', 'papelaria', 'pelucias'];
 
+const GRID_CLASSES = 'grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7';
+
 export function HomePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const category = searchParams.get('category');
+  const q = searchParams.get('q') ?? '';
   const [products, setProducts] = useState<Product[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [category, setCategory] = useState<string | null>(null);
-  const [q, setQ] = useState('');
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
@@ -33,17 +37,21 @@ export function HomePage() {
     };
   }, [category, q, nonce]);
 
+  const setCategory = (next: string | null) => {
+    const params = new URLSearchParams(searchParams);
+    if (next) {
+      params.set('category', next);
+    } else {
+      params.delete('category');
+    }
+    setSearchParams(params);
+  };
+
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mb-6">
         <h1 className="font-display text-2xl font-bold">Catálogo</h1>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar produtos…"
-          aria-label="Buscar produtos"
-          className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-neon-cyan focus:outline-none"
-        />
+        {q.trim() && <p className="mt-1 text-sm text-muted">Resultados para “{q.trim()}”</p>}
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
@@ -60,7 +68,7 @@ export function HomePage() {
       {error ? (
         <ErrorState message={error} onRetry={() => setNonce((n) => n + 1)} />
       ) : products === null ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className={GRID_CLASSES}>
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-64 animate-pulse rounded-xl bg-ink-800" />
           ))}
@@ -68,7 +76,7 @@ export function HomePage() {
       ) : products.length === 0 ? (
         <EmptyState title="Nada por aqui" message="Nenhum produto encontrado para esta busca." />
       ) : (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className={GRID_CLASSES}>
           {products.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
