@@ -29,7 +29,7 @@ export function Stars({ value, max = 5, count, size = 'md' }: StarsProps) {
               key={index}
               aria-hidden="true"
               data-testid={filled ? 'star-filled' : 'star-empty'}
-              className={filled ? 'text-neon-cyan' : 'text-ink-700'}
+              className={filled ? 'text-neon-cyan' : 'text-ink-600'}
             >
               {filled ? '★' : '☆'}
             </span>

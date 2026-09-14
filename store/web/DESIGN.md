@@ -2,39 +2,41 @@
 
 ## Tema
 
-**Dark Akihabara / neo-Tokyo.** Fundo quase-preto com um leve grid neon e brilhos
-de gradiente nos cantos (evocando uma vitrine de eletrônicos noturna de Akihabara),
-tipografia geométrica de destaque e acentos neon para ações e estados interativos.
-`html` carrega `class="dark"` e `color-scheme: dark` fixo — não há tema claro no MVP.
+**Light, clean marketplace.** Fundo branco/quase-branco, cards com borda sutil e
+sombra suave, tipografia geométrica de destaque e acentos coloridos (rosa,
+teal, violeta) reservados para ações e estados interativos. `html` não carrega
+mais `class="dark"` e `color-scheme: light` é fixo no `:root`.
 
 ## Paleta de tokens (`tailwind.config.ts`)
 
 | Token | Valor | Uso |
 |---|---|---|
-| `ink-950` | `#07060d` | Fundo da página (`body`) |
-| `ink-900` | `#0e0c1a` | Fundo de header/superfícies elevadas |
-| `ink-800` | `#17142a` | Cards, painéis |
-| `ink-700` | `#242040` | Bordas, divisores |
-| `fg` | `#f4f2ff` | Texto principal |
-| `muted` | `#a9a3c7` | Texto secundário |
-| `neon-pink` | `#ff2e88` | Acento primário (CTAs, preço, destaque de marca) |
-| `neon-cyan` | `#22e4ff` | Foco de teclado, links ativos, acento secundário |
-| `neon-violet` | `#9d5cff` | Acento decorativo (badges, gradientes) |
-| `neon-lime` | `#b6ff3b` | Sucesso / disponibilidade em estoque |
+| `ink-950` | `#f6f6f9` | Fundo da página (`body`) |
+| `ink-900` | `#ffffff` | Fundo de header/cards/superfícies elevadas |
+| `ink-800` | `#eeeef3` | Inputs, hover, skeletons, footer |
+| `ink-700` | `#e3e3ec` | Bordas, divisores |
+| `ink-600` | `#b9b6c8` | Estrelas vazias, divisores mais fortes |
+| `fg` | `#17151f` | Texto principal |
+| `muted` | `#6b6580` | Texto secundário |
+| `neon-pink` | `#d6246e` | Acento primário (CTAs, preço, destaque de marca) |
+| `neon-cyan` | `#0e7490` (teal escuro) | Foco de teclado, links ativos, acento secundário |
+| `neon-violet` | `#7c3aed` | Acento decorativo (badges, gradientes) |
+| `neon-lime` | `#2f7d32` | Sucesso / disponibilidade em estoque |
 
 ### Contraste (AA)
 
-- `fg` (`#f4f2ff`) sobre `ink-950` (`#07060d`) → razão de contraste ≈ 17.6:1 (AAA).
-- `muted` (`#a9a3c7`) sobre `ink-950` → razão ≈ 8.1:1 (AAA para texto normal).
-- `fg` sobre `ink-900`/`ink-800` → ambos acima de 14:1.
-- Os tons `neon-*` são usados como acentos (bordas, ícones, glows), nunca como
-  cor de texto de corpo sobre `ink-950`, para preservar contraste AA em texto.
+- `fg` (`#17151f`) sobre `ink-950` (`#f6f6f9`) → razão de contraste ≈ 16.7:1 (AAA).
+- `muted` (`#6b6580`) sobre branco → razão ≈ 5.5:1; sobre `ink-950` → ≈ 5.1:1 (AA para texto normal).
+- `neon-cyan` (`#0e7490`) sobre branco → razão ≈ 5.4:1 (AA).
+- Texto branco sobre `neon-pink` (`#d6246e`) → razão ≈ 4.8:1 (AA).
+- Os tons `neon-*` são usados como acentos (bordas, ícones, botões), com texto
+  branco sobre fundos coloridos escolhido para manter contraste AA.
 
 ## Foco visível
 
 Regra global em `src/index.css`: `:focus-visible { @apply outline-none ring-2
-ring-neon-cyan ring-offset-2 ring-offset-ink-950; }`. Todo elemento interativo
-(links, botões, campos) herda esse anel neon-cyan ao navegar por teclado.
+ring-neon-cyan ring-offset-2 ring-offset-white; }`. Todo elemento interativo
+(links, botões, campos) herda esse anel teal ao navegar por teclado.
 
 ## Tipografia
 

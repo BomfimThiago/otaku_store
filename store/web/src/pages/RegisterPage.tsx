@@ -191,7 +191,7 @@ export function RegisterPage() {
           <button
             type="submit"
             disabled={busy}
-            className="mt-2 w-full rounded-lg bg-neon-pink px-5 py-3 font-semibold text-ink-950 transition hover:brightness-110 disabled:opacity-60"
+            className="mt-2 w-full rounded-lg bg-neon-pink px-5 py-3 font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
           >
             {busy ? 'Criando conta…' : 'Criar conta'}
           </button>
