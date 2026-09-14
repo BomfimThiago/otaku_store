@@ -1,0 +1,30 @@
+{
+  "name": "store",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "api",
+    "web",
+    "shared",
+    "e2e"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "lint": "echo 'lint: not configured yet (FND-2)'",
+    "test:e2e": "echo 'test:e2e: not configured yet (Playwright)'",
+    "db:up": "echo 'db:up: not configured yet (FND-3)'",
+    "db:down": "echo 'db:down: not configured yet (FND-3)'",
+    "db:migrate": "echo 'db:migrate: not configured yet (FND-4)'",
+    "db:seed": "echo 'db:seed: not configured yet'"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
+  }
+}
