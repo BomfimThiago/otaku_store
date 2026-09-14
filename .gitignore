@@ -36,3 +36,7 @@ coverage/
 # Minion runtime artifacts (state + isolated clones); fixtures are committed separately
 minion/runs/
 minion/clones/
+
+# Local tooling artifacts (Playwright captures, ad-hoc screenshots)
+.playwright-mcp/
+minion-console-*.png

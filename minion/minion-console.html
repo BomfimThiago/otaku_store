@@ -102,6 +102,10 @@
   .status.queued{ color:var(--dim); }
   .status.blocked i{ background:var(--pending); border-radius:2px; }
   .status.blocked{ color:var(--dim); }
+  .status.failed i{ background:var(--fail); }
+  .status.failed{ color:var(--fail); }
+  .status.escalated i{ background:var(--fail); border-radius:2px; }
+  .status.escalated{ color:var(--fail); }
   .run-card .lockinfo{
     font-family:'IBM Plex Mono', monospace; font-size:0.66rem; color:var(--dim);
     background:var(--surface-2); border-radius:5px; padding:3px 7px; margin-top:1px;
@@ -276,6 +280,8 @@
     margin-left:auto; font-family:'IBM Plex Mono', monospace; font-size:0.66rem; text-transform:uppercase;
     background:var(--fail-soft); color:var(--fail); padding:3px 8px; border-radius:5px; font-weight:700;
   }
+  .vscore.approved .num{ color:var(--verify); }
+  .vscore.approved .verdict-tag{ background:var(--verify-soft); color:var(--verify); }
   .checklist{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
   .cl-item{ display:flex; gap:8px; font-size:0.8rem; align-items:flex-start; }
   .cl-item .m{ font-weight:700; font-family:'IBM Plex Mono', monospace; }
@@ -294,292 +300,251 @@
   .diffpanel .ctx{ color:var(--dim); display:block; }
 
   footer.note{ margin-top:22px; font-size:0.78rem; color:var(--dim); font-style:italic; }
+  .empty{ padding:60px 20px; text-align:center; color:var(--dim); }
+  .empty code{ color:var(--accent); }
 </style>
 
 <div class="app">
-
   <div class="topbar">
-    <div class="brand"><span class="dot"></span>minion console <small>local · v0.2</small></div>
-    <div class="stats">
-      <span>runs ativos <b>2</b></span>
-      <span>bloqueados por lock <b>1</b></span>
-      <span>hoje <b>11</b> tarefas concluídas</span>
-    </div>
+    <div class="brand"><span class="dot"></span>minion console <small>local · live</small></div>
+    <div class="stats" id="topstats"></div>
   </div>
 
   <aside class="sidebar">
     <div class="eyebrow">Runs</div>
-
-    <div class="run-card active">
-      <div class="repo">pricing-service</div>
-      <div class="task">corrige test_calculate_discount que está falhando</div>
-      <div class="status running"><i></i>implementação · tentativa 2/2</div>
-    </div>
-
-    <div class="run-card">
-      <div class="repo">auth-service</div>
-      <div class="task">adiciona validação de e-mail no cadastro</div>
-      <div class="status done"><i></i>pronto p/ revisão</div>
-    </div>
-
-    <div class="run-card">
-      <div class="repo">notifications-worker</div>
-      <div class="task">atualiza dependência do logger para v3</div>
-      <div class="status running"><i></i>implementando · sem conflito</div>
-    </div>
-
-    <div class="run-card">
-      <div class="repo">pricing-service</div>
-      <div class="task">atualiza cálculo de imposto p/ nova alíquota</div>
-      <div class="status blocked"><i></i>bloqueado por lock</div>
-      <div class="lockinfo">aguardando src/pricing.py</div>
-    </div>
+    <div id="runlist"></div>
   </aside>
 
-  <main>
-    <div class="run-header">
-      <div>
-        <h1>corrige test_calculate_discount que está falhando</h1>
-        <div class="meta">
-          <span>repo <b>pricing-service</b></span>
-          <span>worktree <b>wt-4f21a</b></span>
-          <span>iniciado às <b>14:02:07</b></span>
+  <main id="main">
+    <div class="empty">nenhum run ainda — rode <code>minion run "…"</code> em outro terminal</div>
+  </main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const TIER_LABEL = { strong: "modelo forte", fast: "modelo rápido" };
+  const RUN_STATUS_LABEL = {
+    running: "em execução", done: "pronto p/ revisão", queued: "na fila",
+    blocked: "bloqueado por lock", failed: "falhou", escalated: "escalado p/ humano",
+  };
+  const STEP_CLASS = { done: "done", active: "active", failed: "failed", skipped: "pending", pending: "pending" };
+
+  let blueprint = [];              // [{node, type, label, tier, conditional, loops}]
+  let runs = [];                   // newest first
+  let selectedId = null;
+  let logCache = [];               // log for the selected run
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const fmtClock = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "" : d.toTimeString().slice(0, 8);
+  };
+  const fmtElapsed = (run) => {
+    if (!run.startedAt) return "—";
+    const end = run.finishedAt ? new Date(run.finishedAt) : new Date();
+    const ms = end - new Date(run.startedAt);
+    if (!Number.isFinite(ms) || ms < 0) return "—";
+    const s = Math.floor(ms / 1000);
+    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  };
+  const stepDur = (step) => {
+    if (!step.startedAt || !step.finishedAt) return "";
+    const ms = new Date(step.finishedAt) - new Date(step.startedAt);
+    return Number.isFinite(ms) && ms >= 0 ? ` ${(ms / 1000).toFixed(1)}s` : "";
+  };
+
+  async function getJson(url) {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error(`${url} → ${r.status}`);
+    return r.json();
+  }
+
+  // ---------------- rendering ----------------
+
+  function renderTopStats() {
+    const active = runs.filter((r) => r.status === "running").length;
+    const blocked = runs.filter((r) => r.status === "blocked").length;
+    const done = runs.filter((r) => r.status === "done").length;
+    document.getElementById("topstats").innerHTML =
+      `<span>runs ativos <b>${active}</b></span>` +
+      `<span>bloqueados <b>${blocked}</b></span>` +
+      `<span>concluídos <b>${done}</b></span>`;
+  }
+
+  function renderSidebar() {
+    const list = document.getElementById("runlist");
+    if (runs.length === 0) { list.innerHTML = ""; return; }
+    list.innerHTML = runs.map((r) => {
+      const st = RUN_STATUS_LABEL[r.status] ?? r.status;
+      const lock = r.status === "blocked" && r.lockedFiles && r.lockedFiles.length
+        ? `<div class="lockinfo">aguardando ${esc(r.lockedFiles[0])}</div>` : "";
+      return `<div class="run-card ${r.id === selectedId ? "active" : ""}" data-id="${esc(r.id)}">
+        <div class="repo">${esc(r.repo?.name ?? "repo")}</div>
+        <div class="task">${esc(r.workItem)}</div>
+        <div class="status ${esc(r.status)}"><i></i>${esc(st)}</div>
+        ${lock}
+      </div>`;
+    }).join("");
+    list.querySelectorAll(".run-card").forEach((el) => {
+      el.addEventListener("click", () => { selectedId = el.dataset.id; refreshSelected(true); });
+    });
+  }
+
+  function railCard(spec, step) {
+    const status = step ? (STEP_CLASS[step.status] ?? "pending") : "pending";
+    const badges = [`<span class="badge ${spec.type}">${spec.type === "det" ? "det" : spec.type}</span>`];
+    if (spec.tier) badges.push(`<span class="badge model">${TIER_LABEL[spec.tier] ?? spec.tier}</span>`);
+    if (spec.conditional) badges.push(`<span class="badge cond">condicional · só se tocar frontend</span>`);
+
+    let statusText = "—";
+    if (step) {
+      if (step.status === "done") statusText = `✓${stepDur(step)}`;
+      else if (step.status === "active") statusText = step.attempt ? `tentativa ${step.attempt}/${step.maxAttempts ?? 2} · rodando…` : "rodando…";
+      else if (step.status === "failed") statusText = "✗";
+      else if (step.status === "skipped") statusText = "pulado";
+    }
+    const sub = step && step.summary
+      ? `<div class="card-sub">${esc(step.summary)}</div>`
+      : (step && step.skippedReason ? `<div class="card-sub">${esc(step.skippedReason)}</div>` : "");
+
+    return `<div class="rstep ${spec.type} ${status}">
+      <div class="card">
+        <div class="card-top">
+          <span class="step-name">${esc(spec.label)}</span>
+          ${badges.join("")}
+          <span class="card-status">${statusText}</span>
         </div>
+        ${sub}
       </div>
-      <div class="btnrow">
-        <button class="btn">ver worktree</button>
-        <button class="btn primary">aprovar diff</button>
-      </div>
-    </div>
+    </div>`;
+  }
 
-    <div class="statrow">
-      <div class="stat warn"><span class="n">00:41</span><span class="l">tempo decorrido</span></div>
-      <div class="stat bad"><span class="n">1/2</span><span class="l">reprovações do judge</span></div>
-      <div class="stat"><span class="n">6</span><span class="l">chamadas de modelo · 2 fortes</span></div>
-      <div class="stat"><span class="n">14.9k</span><span class="l">tokens usados</span></div>
-    </div>
+  function renderMain(run) {
+    const stepByNode = new Map((run.steps ?? []).map((s) => [s.node, s]));
+    const doneCount = (run.steps ?? []).filter((s) => s.status === "done").length;
+    const rejections = (run.verdicts ?? []).filter((v) => v.verdict === "rejected").length;
+    const lastRejected = [...(run.verdicts ?? [])].reverse().find((v) => v.verdict === "rejected");
+    const lastVerdict = (run.verdicts ?? [])[run.verdicts.length - 1];
 
-    <div class="lockpanel">
-      <div class="lockpanel-head">Agendador · locks ativos</div>
-      <div class="lockrow">
-        <span class="lf">src/pricing.py</span>
-        <span class="lh">preso por <b>este run</b> desde 14:02:08</span>
-        <span class="lq">1 run na fila atrás</span>
-      </div>
-    </div>
+    const rail = blueprint.map((spec) => railCard(spec, stepByNode.get(spec.node))).join("");
 
-    <div class="sec-head">
-      <h2>Blueprint do run</h2>
-      <div class="type-legend">
-        <span><i class="det"></i>determinístico</span>
-        <span><i class="agent"></i>agente</span>
-        <span><i class="judge"></i>judge</span>
-      </div>
-    </div>
+    const locks = (run.lockedFiles ?? []).length
+      ? run.lockedFiles.map((f) => `<div class="lockrow">
+            <span class="lf">${esc(f)}</span>
+            <span class="lh">preso por <b>este run</b></span>
+          </div>`).join("")
+      : `<div class="lockrow"><span class="lh">sem locks (o plano ainda não fixou arquivos)</span></div>`;
 
-    <div class="rail">
-
-      <div class="rstep det done">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Agendar / lock de arquivos</span>
-            <span class="badge det">det</span>
-            <span class="card-status">✓ 0.1s</span>
-          </div>
-          <div class="card-sub">reservou <b>src/pricing.py</b> — nenhuma colisão com runs em andamento no momento do início</div>
-        </div>
-      </div>
-
-      <div class="rstep det done">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Isolar ambiente</span>
-            <span class="badge det">det</span>
-            <span class="card-status">✓ 0.4s</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="rstep agent done">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Coletar contexto</span>
-            <span class="badge agent">agente</span>
-            <span class="badge model">modelo rápido</span>
-            <span class="card-status">✓ 2.8s</span>
-          </div>
-          <div class="parallel-row">
-            <div class="parallel-item">
-              <div class="pt">Código + RAG interno</div>
-              <div class="ps">✓ 6 trechos relevantes recuperados</div>
-            </div>
-            <div class="parallel-item">
-              <div class="pt">Fontes oficiais (Tavily / Context7)</div>
-              <div class="ps">✓ doc da lib de cálculo fiscal, v2.3 (atual)</div>
-            </div>
-          </div>
-          <span class="parallel-tag">∥ subagents rodando em paralelo</span>
-        </div>
-      </div>
-
-      <div class="rstep agent done">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Apresentar plano</span>
-            <span class="badge agent">agente</span>
-            <span class="badge model">modelo forte</span>
-            <span class="card-status">✓ 3.1s</span>
-          </div>
-          <div class="card-sub">3 passos · toca <b>src/pricing.py</b> · nenhuma dependência nova</div>
-        </div>
-      </div>
-
-      <div class="rstep judge done">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Judge · plano</span>
-            <span class="badge judge">judge</span>
-            <span class="badge model">modelo forte</span>
-            <span class="card-status">✓ aprovado · 88/100</span>
-          </div>
-          <div class="card-sub">Ordem de cálculo bate com a doc oficial recuperada. Aprovado de primeira.</div>
-        </div>
-      </div>
-
-      <div class="rstep agent active">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Implementar</span>
-            <span class="badge agent">agente</span>
-            <span class="badge model">modelo rápido</span>
-            <span class="card-status">tentativa 2/2 · rodando…</span>
-          </div>
-          <div class="card-sub">Reescrevendo <b>src/pricing.py</b> considerando a crítica do judge abaixo.</div>
-        </div>
-      </div>
-
-      <div class="loopback">
+    const loop = lastRejected ? `<div class="loopback">
         <span class="ic">↩</span>
-        <span><b>Tentativa 1 reprovada</b> pelo Judge de implementação (score 42/100) — motivo e checklist completo no painel à direita. Corrigindo com o feedback antes de seguir.</span>
-      </div>
+        <span><b>Reprovado</b> pelo Judge de ${lastRejected.judge === "plan" ? "plano" : "implementação"} (score ${lastRejected.score}/100) — corrigindo com o feedback antes de seguir.</span>
+      </div>` : "";
 
-      <div class="rstep judge pending">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Judge · implementação</span>
-            <span class="badge judge">judge</span>
-            <span class="badge model">modelo forte</span>
-            <span class="card-status">aguardando tentativa 2</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="rstep det pending">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Evals estáticos</span>
-            <span class="badge det">det</span>
-            <span class="card-status">—</span>
-          </div>
-          <div class="card-sub">complexidade ciclomática · tamanho do diff</div>
-        </div>
-      </div>
-
-      <div class="rstep det pending">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Lint + testes</span>
-            <span class="badge det">det</span>
-            <span class="card-status">—</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="rstep det pending">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">E2E (Playwright)</span>
-            <span class="badge det">det</span>
-            <span class="badge cond">condicional · só se tocar frontend</span>
-            <span class="card-status">pulado</span>
-          </div>
-          <div class="card-sub">plano não toca arquivos de frontend — nó pulado deterministicamente</div>
-        </div>
-      </div>
-
-      <div class="rstep det pending">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Sincronizar com main</span>
-            <span class="badge det">det</span>
-            <span class="card-status">—</span>
-          </div>
-          <div class="card-sub">rebase automático · se houver conflito: 1 tentativa de resolução via agente + harness completo de novo antes de aceitar</div>
-        </div>
-      </div>
-
-      <div class="rstep det pending">
-        <div class="card">
-          <div class="card-top">
-            <span class="step-name">Abrir PR</span>
-            <span class="badge det">det</span>
-            <span class="card-status">—</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="panels">
-      <div class="panel">
-        <div class="panel-head">log de execução <span class="live"><i></i>ao vivo</span></div>
-        <div class="log">
-          <div><span class="t">14:02:30</span><span class="who">agent&gt;</span> plano aprovado, iniciando implementação</div>
-          <div><span class="t">14:02:33</span><span class="who">agent&gt;</span> editando src/pricing.py (tentativa 1)</div>
-          <div><span class="t">14:02:36</span><span class="jg">judge&gt;</span> avaliando diff contra o plano aprovado</div>
-          <div><span class="t">14:02:39</span><span class="bad">✕ REPROVADO</span> score 42/100 — ordem de cálculo diverge do plano</div>
-          <div><span class="t">14:02:40</span><span class="who">agent&gt;</span> recebendo crítica do judge, ajustando abordagem</div>
-          <div><span class="t">14:02:41</span><span class="who">agent&gt;</span> editando src/pricing.py (tentativa 2)</div>
-          <div><span class="t">14:02:44</span><span class="who cur">escrevendo</span></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">judge · implementação <span class="tag">tentativa 1 · reprovado</span></div>
+    const verdictPanel = lastVerdict ? `<div class="panel">
+        <div class="panel-head">judge · ${lastVerdict.judge === "plan" ? "plano" : "implementação"} <span class="tag">${lastVerdict.verdict}</span></div>
         <div class="verdict">
-          <div class="vscore">
-            <span class="num">42</span><span class="of">/ 100</span>
-            <span class="verdict-tag">reprovado</span>
+          <div class="vscore ${lastVerdict.verdict === "approved" ? "approved" : ""}">
+            <span class="num">${lastVerdict.score}</span><span class="of">/ 100</span>
+            <span class="verdict-tag">${lastVerdict.verdict}</span>
           </div>
           <div class="checklist">
-            <div class="cl-item pass"><span class="m">✓</span><span>Toca só o arquivo previsto no plano (src/pricing.py)</span></div>
-            <div class="cl-item fail"><span class="m">✕</span><span>Ordem de operações diverge do passo 3 do plano (aplica desconto antes do imposto)</span></div>
-            <div class="cl-item pass"><span class="m">✓</span><span>Nenhuma dependência nova introduzida</span></div>
-            <div class="cl-item fail"><span class="m">✕</span><span>Não cobre o caso de borda "desconto 0%" citado no plano</span></div>
+            ${(lastVerdict.checklist ?? []).map((c) => `<div class="cl-item ${c.passed ? "pass" : "fail"}"><span class="m">${c.passed ? "✓" : "✕"}</span><span>${esc(c.label)}</span></div>`).join("")}
           </div>
-          <div class="critique">
-            <b>Crítica enviada de volta ao agente:</b> reimplementar seguindo a ordem de cálculo do passo 3 (imposto sobre o preço já descontado) e adicionar o caso de desconto 0%.
+          ${lastVerdict.critique ? `<div class="critique"><b>Crítica:</b> ${esc(lastVerdict.critique)}</div>` : ""}
+        </div>
+      </div>` : "";
+
+    const live = run.status === "running" ? `<span class="live"><i></i>ao vivo</span>` : "";
+    const logRows = logCache.map((e) => {
+      const who = e.actor === "judge" ? "jg" : "who";
+      const lvl = e.level === "error" ? "bad" : e.level === "ok" ? "ok" : "";
+      const whoLabel = e.actor === "judge" ? "judge&gt;" : e.actor === "agent" ? "agent&gt;" : "sys&gt;";
+      return `<div><span class="t">${fmtClock(e.ts)}</span><span class="${who}">${whoLabel}</span> <span class="${lvl}">${esc(e.message)}</span></div>`;
+    }).join("");
+
+    document.getElementById("main").innerHTML = `
+      <div class="run-header">
+        <div>
+          <h1>${esc(run.workItem)}</h1>
+          <div class="meta">
+            <span>repo <b>${esc(run.repo?.name ?? "")}</b></span>
+            ${run.branch ? `<span>branch <b>${esc(run.branch)}</b></span>` : ""}
+            ${run.startedAt ? `<span>iniciado às <b>${fmtClock(run.startedAt)}</b></span>` : ""}
           </div>
         </div>
+        <div class="btnrow"><button class="btn">ver clone</button><button class="btn primary">aprovar diff</button></div>
       </div>
-    </div>
 
-    <div class="panel diffpanel" style="margin-bottom:16px;">
-      <div class="panel-head">diff · src/pricing.py <span class="live"><i></i>tentativa 2 em andamento</span></div>
-      <div class="diff">
-        <div class="file">1 arquivo alterado</div>
-        <pre><span class="ctx">  def calculate_discount(price, discount, tax_rate):</span>
-<span class="rm">-     total = apply_tax(price, tax_rate) * (1 - discount)</span>
-<span class="ad">+     total = apply_tax(price * (1 - discount), tax_rate)</span>
-<span class="ad">+     if discount == 0:</span>
-<span class="ad">+         return round(apply_tax(price, tax_rate), 2)</span>
-<span class="ctx">      return round(total, 2)</span></pre>
+      <div class="statrow">
+        <div class="stat ${run.status === "running" ? "warn" : ""}"><span class="n">${fmtElapsed(run)}</span><span class="l">tempo decorrido</span></div>
+        <div class="stat ${rejections ? "bad" : ""}"><span class="n">${rejections}/${blueprint.length ? 2 : 2}</span><span class="l">reprovações do judge</span></div>
+        <div class="stat"><span class="n">${doneCount}/${blueprint.length}</span><span class="l">nós concluídos</span></div>
+        <div class="stat"><span class="n">${esc(RUN_STATUS_LABEL[run.status] ?? run.status)}</span><span class="l">estado</span></div>
       </div>
-    </div>
 
-    <footer class="note">
-      Mockup ilustrativo — dados de exemplo. O botão "aprovar diff" só ativa quando o pipeline chega em "Abrir PR"; até lá, toda correção passa pelo teto de 2 tentativas por etapa antes de escalar para revisão humana.
-    </footer>
-  </main>
+      <div class="lockpanel">
+        <div class="lockpanel-head">Agendador · locks ativos</div>
+        ${locks}
+      </div>
 
-</div>
+      <div class="sec-head">
+        <h2>Blueprint do run</h2>
+        <div class="type-legend">
+          <span><i class="det"></i>determinístico</span>
+          <span><i class="agent"></i>agente</span>
+          <span><i class="judge"></i>judge</span>
+        </div>
+      </div>
+
+      <div class="rail">${rail}</div>
+      ${loop}
+
+      <div class="panels">
+        <div class="panel">
+          <div class="panel-head">log de execução ${live}</div>
+          <div class="log">${logRows || '<div class="t">sem eventos ainda</div>'}</div>
+        </div>
+        ${verdictPanel}
+      </div>
+
+      <footer class="note">Dados reais — lidos de minion/runs/run-${esc(run.id)}.json ao vivo.</footer>
+    `;
+  }
+
+  // ---------------- polling ----------------
+
+  async function refreshSelected(force) {
+    const run = runs.find((r) => r.id === selectedId);
+    if (!run) return;
+    try { logCache = (await getJson(`/api/runs/${run.id}/log`)).log ?? []; } catch { logCache = []; }
+    renderMain(run);
+  }
+
+  async function tick() {
+    try {
+      runs = (await getJson("/api/runs")).runs ?? [];
+    } catch { runs = []; }
+
+    if (runs.length && (!selectedId || !runs.some((r) => r.id === selectedId))) {
+      selectedId = runs[0].id;
+    }
+    renderTopStats();
+    renderSidebar();
+    if (selectedId) await refreshSelected();
+    else document.getElementById("main").innerHTML =
+      '<div class="empty">nenhum run ainda — rode <code>minion run "…"</code> em outro terminal</div>';
+  }
+
+  async function boot() {
+    try { blueprint = (await getJson("/api/blueprint")).nodes ?? []; } catch { blueprint = []; }
+    await tick();
+    setInterval(tick, 1000);
+  }
+
+  boot();
+})();
+</script>
