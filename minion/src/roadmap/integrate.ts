@@ -41,16 +41,16 @@ export class Integrator {
   /** Ensure `integrationBranch` exists (branched from `baseBranch` if new) and a
    *  clean worktree is checked out on it. Idempotent across runs. */
   async prepare(baseBranch: string): Promise<void> {
-    const exists = await this.git(["rev-parse", "--verify", "--quiet", this.integrationBranch], this.repoRoot);
-    if (exists.code !== 0) {
-      await this.expect(
-        this.git(["branch", this.integrationBranch, baseBranch], this.repoRoot),
-        `create ${this.integrationBranch}`,
-      );
-    }
-    // Recreate the worktree fresh (remove a stale one first; ignore if absent).
+    // Clear any stale worktree first (a branch checked out in a worktree can't be moved).
     await this.git(["worktree", "remove", "--force", this.worktreeDir], this.repoRoot);
+    await this.git(["worktree", "prune"], this.repoRoot);
     await rm(this.worktreeDir, { recursive: true, force: true });
+
+    // Start the integration branch fresh from base — each build begins clean.
+    const exists = await this.git(["rev-parse", "--verify", "--quiet", this.integrationBranch], this.repoRoot);
+    const set = exists.code === 0 ? ["branch", "-f", this.integrationBranch, baseBranch] : ["branch", this.integrationBranch, baseBranch];
+    await this.expect(this.git(set, this.repoRoot), `set ${this.integrationBranch} to ${baseBranch}`);
+
     await this.expect(
       this.git(["worktree", "add", "--force", this.worktreeDir, this.integrationBranch], this.repoRoot),
       "add worktree",
@@ -78,6 +78,18 @@ export class Integrator {
   async head(): Promise<string> {
     const r = await this.git(["rev-parse", "--short", this.integrationBranch], this.repoRoot);
     return r.code === 0 ? r.stdout.trim() : "?";
+  }
+
+  /** Push the integration branch to origin (for the develop → main promotion PR). */
+  push(): Promise<CommandResult> {
+    return this.git(["push", "origin", this.integrationBranch], this.repoRoot);
+  }
+
+  /** Remove the worktree and delete its folder. Leaves the branch intact. */
+  async teardown(): Promise<void> {
+    await this.git(["worktree", "remove", "--force", this.worktreeDir], this.repoRoot);
+    await this.git(["worktree", "prune"], this.repoRoot);
+    await rm(this.worktreeDir, { recursive: true, force: true });
   }
 
   private async expect(p: Promise<CommandResult>, what: string): Promise<CommandResult> {

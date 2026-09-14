@@ -26,6 +26,7 @@ import {
   type RoadmapResult,
 } from "../roadmap/index.js";
 import { Scheduler } from "../scheduler/index.js";
+import { run } from "../util/exec.js";
 import type { NodeHandlers } from "../orchestrator/index.js";
 import type { MinionConfig } from "../types/config.js";
 import type { BacklogItem } from "../types/backlog.js";
@@ -143,7 +144,56 @@ async function runSpec(args: ParsedArgs, deps: SpecDeps): Promise<void> {
 
   printRoadmapResult(result);
   console.log(`\n  ${integrationBranch} @ ${await integrator.head()} — built product in ${integrationDir}`);
+
+  // Complete build → finalize: push develop, open the develop → main PR (the one
+  // merge that always needs a human), then remove the worktree + folder. Capped
+  // batches keep the worktree for the next batch.
+  const clean =
+    result.dispatch !== undefined &&
+    result.dispatch.failed.length === 0 &&
+    result.dispatch.escalated.length === 0 &&
+    result.dispatch.unreached.length === 0;
+  const complete = args.maxItems === undefined && result.status === "delivered" && clean;
+
+  if (complete) {
+    await finalize(integrator, integrationBranch, deps.repoRoot, args.openPr);
+  } else if (result.status === "delivered") {
+    console.log(`  (incremental batch — worktree kept at ${integrationDir} for the next batch)`);
+  }
+
   process.exitCode = result.status === "delivered" ? 0 : 1;
+}
+
+async function finalize(
+  integrator: Integrator,
+  integrationBranch: string,
+  repoRoot: string,
+  openPr: boolean,
+): Promise<void> {
+  if (openPr) {
+    console.log(`\n  finalizing: pushing '${integrationBranch}' and opening PR → main…`);
+    const push = await integrator.push();
+    if (push.code !== 0) {
+      console.log(`  push failed: ${push.stderr.trim()}`);
+    } else {
+      const pr = await run(
+        "gh",
+        [
+          "pr", "create",
+          "--base", "main",
+          "--head", integrationBranch,
+          "--title", "OtakuVerso: promote develop → main",
+          "--body", "Built by the Minion from store/STORE_SPEC.md. Review and merge to promote.",
+        ],
+        { cwd: repoRoot },
+      );
+      console.log(pr.code === 0 ? `  PR opened: ${pr.stdout.trim()}` : `  gh pr create failed: ${pr.stderr.trim()}`);
+    }
+  } else {
+    console.log(`\n  [dry-run] build complete — would push '${integrationBranch}' and open PR → main`);
+  }
+  await integrator.teardown();
+  console.log(`  cleaned up integration worktree`);
 }
 
 function runWorker(
