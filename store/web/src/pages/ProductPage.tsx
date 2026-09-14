@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router';
 import { getProduct } from '../api/client.js';
 import type { Product } from '../api/types.js';
 import { ProductImage } from '../components/ProductImage.js';
+import { RelatedProducts } from '../components/RelatedProducts.js';
 import { ReviewsSection } from '../components/ReviewsSection.js';
 import { useCart } from '../cart/CartContext.js';
 import { useToast } from '../toast/ToastProvider.js';
@@ -161,6 +162,7 @@ export function ProductPage() {
       </div>
 
       <ReviewsSection slug={product.slug} />
+      <RelatedProducts product={product} />
     </main>
   );
 }
