@@ -10,8 +10,10 @@ export interface Product {
   description: string;
   category: string;
   priceCents: Cents;
-  imageUrl: string;
+  images: string[];
   stock: number;
+  ratingAverage?: number;
+  ratingCount?: number;
 }
 
 export interface ProductListParams {
@@ -54,4 +56,42 @@ export interface ApiErrorBody {
   message: string;
   statusCode: number;
   details?: { path: string; code: string; message: string }[];
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface Review {
+  id: string;
+  productSlug: string;
+  userId: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+export interface ReviewsResponse {
+  reviews: Review[];
+  average: number;
+  count: number;
+}
+
+export interface CreateReviewInput {
+  rating: number;
+  comment: string;
 }

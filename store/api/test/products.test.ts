@@ -175,7 +175,7 @@ describe('GET /api/products/:slug', () => {
     const response = await app.inject({ method: 'GET', url: `/api/products/${target.slug}` });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual(target);
+    expect(response.json()).toEqual({ ...target, ratingAverage: 0, ratingCount: 0 });
   });
 
   it('returns a 404 JSON body for an unknown slug', async () => {

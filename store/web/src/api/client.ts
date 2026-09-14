@@ -2,9 +2,15 @@ import type {
   AddToCartInput,
   ApiErrorBody,
   Cart,
+  CreateReviewInput,
+  LoginInput,
   Product,
   ProductListParams,
+  RegisterInput,
+  Review,
+  ReviewsResponse,
   UpdateCartItemInput,
+  User,
 } from './types.js';
 
 export class ApiError extends Error {
@@ -96,5 +102,40 @@ export function updateCartItem(itemId: string, input: UpdateCartItemInput): Prom
 export function removeCartItem(itemId: string): Promise<void> {
   return request<void>(`/api/cart/${encodeURIComponent(itemId)}`, {
     method: 'DELETE',
+  });
+}
+
+export function register(input: RegisterInput): Promise<User> {
+  return request<User>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function login(input: LoginInput): Promise<User> {
+  return request<User>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function logout(): Promise<void> {
+  return request<void>('/api/auth/logout', {
+    method: 'POST',
+  });
+}
+
+export function me(): Promise<User> {
+  return request<User>('/api/auth/me');
+}
+
+export function listReviews(slug: string): Promise<ReviewsResponse> {
+  return request<ReviewsResponse>(`/api/products/${encodeURIComponent(slug)}/reviews`);
+}
+
+export function createReview(slug: string, input: CreateReviewInput): Promise<Review> {
+  return request<Review>(`/api/products/${encodeURIComponent(slug)}/reviews`, {
+    method: 'POST',
+    body: JSON.stringify(input),
   });
 }

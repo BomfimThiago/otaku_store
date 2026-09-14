@@ -1,8 +1,26 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import type { ReviewsStore } from '../data/reviews.js';
 import { productSchema, products } from '../data/products.js';
+import type { Product } from '../data/products.js';
 
-const productsRoute: FastifyPluginAsyncZod = async (app) => {
+const productWithRatingSchema = productSchema.extend({
+  ratingAverage: z.number(),
+  ratingCount: z.number().int(),
+});
+
+export interface ProductsRouteOptions {
+  reviewsStore: ReviewsStore;
+}
+
+const productsRoute: FastifyPluginAsyncZod<ProductsRouteOptions> = async (app, opts) => {
+  const { reviewsStore } = opts;
+
+  function withRating(product: Product) {
+    const { average, count } = reviewsStore.getAggregate(product.slug);
+    return { ...product, ratingAverage: average, ratingCount: count };
+  }
+
   app.get(
     '/api/products',
     {
@@ -12,7 +30,7 @@ const productsRoute: FastifyPluginAsyncZod = async (app) => {
           q: z.string().optional(),
         }),
         response: {
-          200: z.array(productSchema),
+          200: z.array(productWithRatingSchema),
         },
       },
     },
@@ -20,17 +38,19 @@ const productsRoute: FastifyPluginAsyncZod = async (app) => {
       const category = req.query.category?.trim();
       const q = req.query.q?.trim().toLowerCase();
 
-      return products.filter((product) => {
-        if (category && product.category !== category) {
-          return false;
-        }
+      return products
+        .filter((product) => {
+          if (category && product.category !== category) {
+            return false;
+          }
 
-        if (q && !product.name.toLowerCase().includes(q) && !product.description.toLowerCase().includes(q)) {
-          return false;
-        }
+          if (q && !product.name.toLowerCase().includes(q) && !product.description.toLowerCase().includes(q)) {
+            return false;
+          }
 
-        return true;
-      });
+          return true;
+        })
+        .map(withRating);
     },
   );
 
@@ -40,7 +60,7 @@ const productsRoute: FastifyPluginAsyncZod = async (app) => {
       schema: {
         params: z.object({ slug: z.string() }),
         response: {
-          200: productSchema,
+          200: productWithRatingSchema,
         },
       },
     },
@@ -51,7 +71,7 @@ const productsRoute: FastifyPluginAsyncZod = async (app) => {
         throw Object.assign(new Error('Product not found'), { statusCode: 404 });
       }
 
-      return product;
+      return withRating(product);
     },
   );
 };

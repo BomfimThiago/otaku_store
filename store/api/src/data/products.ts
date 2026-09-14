@@ -13,6 +13,11 @@ export const productSchema = z.object({
 
 export type Product = z.infer<typeof productSchema>;
 
+// Product photos are real Wikimedia Commons thumbnails, credited to their
+// respective uploaders and licensed under CC BY / CC BY-SA. Source pages:
+// https://commons.wikimedia.org/ — see each file's page for full attribution.
+// Products without a suitable Commons photo (One Piece Volume 1, Pôster Demon
+// Slayer A2) use the neon placeholder from src/lib/image.ts instead.
 export const products: Product[] = [
   {
     id: '1',
@@ -23,7 +28,9 @@ export const products: Product[] = [
     category: 'figures',
     priceCents: 34990,
     stock: 12,
-    images: ['/images/products/nendoroid-goku-super-saiyajin-1.jpg'],
+    images: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/NYCC_2018_pics_27.jpg/500px-NYCC_2018_pics_27.jpg',
+    ],
   },
   {
     id: '2',
@@ -34,7 +41,9 @@ export const products: Product[] = [
     category: 'figures',
     priceCents: 54990,
     stock: 8,
-    images: ['/images/products/figuarts-luffy-gear-5-1.jpg'],
+    images: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Figura_Monkey_D_Luffy_A74007320250206.jpg/500px-Figura_Monkey_D_Luffy_A74007320250206.jpg',
+    ],
   },
   {
     id: '3',
@@ -44,7 +53,7 @@ export const products: Product[] = [
     category: 'mangas',
     priceCents: 2990,
     stock: 40,
-    images: ['/images/products/one-piece-volume-1-1.jpg'],
+    images: ['https://placehold.co/600x600/17142a/22e4ff?text=One%20Piece%20Volume%201'],
   },
   {
     id: '4',
@@ -54,7 +63,9 @@ export const products: Product[] = [
     category: 'mangas',
     priceCents: 24990,
     stock: 15,
-    images: ['/images/products/attack-on-titan-box-set-1.jpg'],
+    images: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Ataque_a_los_titanes_tomos_de_Manga_%281%29.jpg/500px-Ataque_a_los_titanes_tomos_de_Manga_%281%29.jpg',
+    ],
   },
   {
     id: '5',
@@ -64,7 +75,9 @@ export const products: Product[] = [
     category: 'vestuario',
     priceCents: 7990,
     stock: 30,
-    images: ['/images/products/camiseta-akatsuki-preta-1.jpg'],
+    images: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Naruto_Akatsuki_robe.JPG/500px-Naruto_Akatsuki_robe.JPG',
+    ],
   },
   {
     id: '6',
@@ -74,7 +87,9 @@ export const products: Product[] = [
     category: 'acessorios',
     priceCents: 3490,
     stock: 50,
-    images: ['/images/products/chaveiro-totoro-pelucia-1.jpg'],
+    images: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Kitano_Tenjin_totoro.jpg/500px-Kitano_Tenjin_totoro.jpg',
+    ],
   },
   {
     id: '7',
@@ -84,7 +99,7 @@ export const products: Product[] = [
     category: 'papelaria',
     priceCents: 4990,
     stock: 25,
-    images: ['/images/products/poster-demon-slayer-a2-1.jpg'],
+    images: ['https://placehold.co/600x600/17142a/22e4ff?text=P%C3%B4ster%20Demon%20Slayer%20A2'],
   },
   {
     id: '8',
@@ -94,6 +109,8 @@ export const products: Product[] = [
     category: 'pelucias',
     priceCents: 12990,
     stock: 20,
-    images: ['/images/products/pelucia-pikachu-30cm-1.jpg'],
+    images: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Pikachu_4878.jpg/500px-Pikachu_4878.jpg',
+    ],
   },
 ];
