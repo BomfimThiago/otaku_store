@@ -1,30 +1,40 @@
 /**
  * `minion run <work item>` — the entry point (SPEC §5, FR1).
  *
- * The work item is polymorphic: a spec file routes to the roadmap layer (§5.1),
- * a task or issue routes to a single worker blueprint (§5.2). Both share this
- * front door. The target repo is the one the Minion is installed in — auto-
+ * The work item is polymorphic: a spec file routes to the roadmap layer (§5.1,
+ * decompose → judge → dispatch → build), a task or issue routes to a single
+ * worker blueprint (§5.2). Both share this front door and the same wired
+ * collaborators. The target repo is the one the Minion is installed in — auto-
  * detected, never passed as an argument.
  *
  * Type detection is deterministic (no LLM): an existing `.md` path is a spec;
  * `--issue N` is an issue; anything else is a free-text task.
  */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { SdkAgentRunner, loadMcpServers } from "../agent/index.js";
 import { loadConfig } from "../config/index.js";
 import { EnvManager } from "../env/index.js";
 import { HarnessRunner, defaultRegistry } from "../harness/index.js";
-import { Orchestrator, type WorkerResult } from "../orchestrator/index.js";
+import { Orchestrator, type WorkerResult, type WorkerStatus } from "../orchestrator/index.js";
 import { StateStore } from "../persistence/index.js";
 import { GitRepoOps, type PrResult, type RepoOps } from "../repo/index.js";
+import {
+  runRoadmap,
+  type ItemOutcome,
+  type RoadmapResult,
+} from "../roadmap/index.js";
 import { Scheduler } from "../scheduler/index.js";
+import type { NodeHandlers } from "../orchestrator/index.js";
+import type { MinionConfig } from "../types/config.js";
+import type { BacklogItem } from "../types/backlog.js";
 import type { Run } from "../types/run.js";
 import { createWorkerHandlers } from "../worker/handlers.js";
 
 interface ParsedArgs {
   workItem: string;
   openPr: boolean;
+  maxItems?: number;
 }
 
 type WorkItemKind = "spec" | "issue" | "task";
@@ -43,18 +53,8 @@ export async function runCommand(argv: string[]): Promise<void> {
   console.log(`config: ${source}`);
   console.log(`input:  ${kind} — "${truncate(args.workItem, 80)}"`);
 
-  if (kind === "spec") {
-    console.error(
-      "\nSpec → roadmap layer (decompose → dispatch) is not wired yet.\n" +
-        'Run a single task for now, e.g.  minion run "add a health-check endpoint"',
-    );
-    process.exitCode = 2;
-    return;
-  }
-
   const projectDir = path.join(repoRoot, "minion");
   const store = new StateStore(path.join(projectDir, "runs"));
-  const scheduler = new Scheduler();
   const env = new EnvManager(path.join(projectDir, "clones"));
   const gitRepo = new GitRepoOps(env);
   const repo: RepoOps = args.openPr ? gitRepo : withDryRunPr(gitRepo);
@@ -62,32 +62,101 @@ export async function runCommand(argv: string[]): Promise<void> {
   const mcpServers = loadMcpServers(path.join(repoRoot, ".mcp.json"));
   const agent = new SdkAgentRunner({ projectDir, mcpServers });
   const handlers = createWorkerHandlers({ agent, harness, repo, config });
-  const orchestrator = new Orchestrator(store, scheduler, handlers, config);
+  const repoName = path.basename(repoRoot);
 
-  const run = newRun(args.workItem, path.basename(repoRoot), config.repo.source);
-  console.log(
-    `\n▶ run ${run.id}${args.openPr ? "" : "  (dry-run: no push/PR)"}\n`,
-  );
+  if (kind === "spec") {
+    await runSpec(args, { store, agent, handlers, config, repoName, repoRoot });
+    return;
+  }
 
-  const result = await orchestrator.runWorker(run);
+  // task / issue → single worker
+  const run = newRun(args.workItem, repoName, config.repo.source);
+  console.log(`\n▶ run ${run.id}${args.openPr ? "" : "  (dry-run: no push/PR)"}\n`);
+  const result = await runWorker(run, store, handlers, config);
   printResult(result);
   process.exitCode = result.status === "done" ? 0 : 1;
+}
+
+// ---- spec → roadmap layer ----
+
+interface SpecDeps {
+  store: StateStore;
+  agent: SdkAgentRunner;
+  handlers: NodeHandlers;
+  config: MinionConfig;
+  repoName: string;
+  repoRoot: string;
+}
+
+async function runSpec(args: ParsedArgs, deps: SpecDeps): Promise<void> {
+  const specContent = readFileSync(path.resolve(deps.repoRoot, args.workItem), "utf8");
+  console.log(
+    `\n▶ roadmap: building from ${args.workItem}${args.openPr ? "" : "  (dry-run: no push/PR)"}` +
+      `${args.maxItems !== undefined ? `  (max ${args.maxItems} items)` : ""}\n`,
+  );
+
+  // Each ready item runs through the worker blueprint. The dispatch loop owns the
+  // cross-item lock table; each worker gets a fresh scheduler (its own schedule
+  // node locks nothing pre-plan), so the two layers never collide.
+  const runItem = async (item: BacklogItem): Promise<ItemOutcome> => {
+    const run = newRunFromItem(item, deps.repoName, deps.config.repo.source);
+    const result = await runWorker(run, deps.store, deps.handlers, deps.config);
+    return toItemOutcome(result.status);
+  };
+
+  const result = await runRoadmap(
+    args.workItem,
+    specContent,
+    {
+      agent: deps.agent,
+      store: deps.store,
+      scheduler: new Scheduler(),
+      config: deps.config,
+      runItem,
+      log: (m) => console.log(`  ${m}`),
+    },
+    args.maxItems !== undefined ? { maxItems: args.maxItems } : {},
+  );
+
+  printRoadmapResult(result);
+  process.exitCode = result.status === "delivered" ? 0 : 1;
+}
+
+function runWorker(
+  run: Run,
+  store: StateStore,
+  handlers: NodeHandlers,
+  config: MinionConfig,
+): Promise<WorkerResult> {
+  return new Orchestrator(store, new Scheduler(), handlers, config).runWorker(run);
+}
+
+function toItemOutcome(status: WorkerStatus): ItemOutcome {
+  if (status === "done") return "done";
+  if (status === "escalated") return "escalated";
+  return "failed";
 }
 
 // ---- input handling ----
 
 function parseArgs(argv: string[]): ParsedArgs {
   let openPr = false;
+  let maxItems: number | undefined;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "--pr") openPr = true;
-    else if (a === "--issue") {
+    else if (a === "--max-items") {
+      const n = Number.parseInt(argv[++i] ?? "", 10);
+      if (Number.isFinite(n) && n > 0) maxItems = n;
+    } else if (a === "--issue") {
       const n = argv[++i];
       if (n !== undefined) rest.push(`Resolve GitHub issue #${n} in this repository.`);
     } else rest.push(a);
   }
-  return { workItem: rest.join(" ").trim(), openPr };
+  const parsed: ParsedArgs = { workItem: rest.join(" ").trim(), openPr };
+  if (maxItems !== undefined) parsed.maxItems = maxItems;
+  return parsed;
 }
 
 function detectKind(workItem: string, repoRoot: string): WorkItemKind {
@@ -100,7 +169,20 @@ function detectKind(workItem: string, repoRoot: string): WorkItemKind {
 
 function newRun(workItem: string, repoName: string, source: string): Run {
   const now = new Date().toISOString();
-  const id = Date.now().toString(36);
+  return baseRun(Date.now().toString(36), workItem, repoName, source, now);
+}
+
+function newRunFromItem(item: BacklogItem, repoName: string, source: string): Run {
+  const now = new Date().toISOString();
+  const criteria = item.acceptanceCriteria.map((c) => `- ${c}`).join("\n");
+  const files = item.likelyFiles.length ? `\n\nSuggested files: ${item.likelyFiles.join(", ")}` : "";
+  const workItem = `${item.description}\n\nAcceptance criteria:\n${criteria}${files}`;
+  const run = baseRun(item.id, workItem, repoName, source, now);
+  run.itemId = item.id;
+  return run;
+}
+
+function baseRun(id: string, workItem: string, repoName: string, source: string, now: string): Run {
   return {
     id,
     workItem,
@@ -128,10 +210,7 @@ function withDryRunPr(repo: RepoOps): RepoOps {
     rebaseOntoBase: repo.rebaseOntoBase.bind(repo),
     teardown: repo.teardown.bind(repo),
     openPr: async (cloneDir, branch): Promise<PrResult> => {
-      console.log(
-        `\n[dry-run] would push "${branch}" and open a PR — skipped.\n` +
-          `          inspect the diff in the isolated clone:\n            ${cloneDir}`,
-      );
+      console.log(`  [dry-run] would push "${branch}" and open a PR — skipped (clone: ${cloneDir})`);
       return { url: `dry-run://no-pr/${branch}` };
     },
   };
@@ -150,24 +229,37 @@ function printResult(result: WorkerResult): void {
   }
   if (run.verdicts.length > 0) {
     console.log("\n  verdicts:");
-    for (const v of run.verdicts) {
-      console.log(`    ${v.judge}: ${v.verdict} (${v.score}/100)`);
-    }
+    for (const v of run.verdicts) console.log(`    ${v.judge}: ${v.verdict} (${v.score}/100)`);
   }
   if (run.escalation) console.log(`\n  escalated: ${run.escalation.trigger} — ${run.escalation.message}`);
   if (run.cloneDir) console.log(`\n  clone: ${run.cloneDir}  (branch ${run.branch})`);
+}
+
+function printRoadmapResult(result: RoadmapResult): void {
+  console.log(`\n══ roadmap: ${result.status.toUpperCase()} ══`);
+  if (result.reason) console.log(`  ${result.reason}`);
+  if (result.backlog) console.log(`  backlog: ${result.backlog.items.length} items from ${result.backlog.source}`);
+  if (result.dispatch) {
+    const d = result.dispatch;
+    console.log(`  done: ${d.done.length} · failed: ${d.failed.length} · escalated: ${d.escalated.length} · unreached: ${d.unreached.length}`);
+    if (d.done.length) console.log(`    ✓ ${d.done.join(", ")}`);
+    if (d.failed.length) console.log(`    ✗ ${d.failed.join(", ")}`);
+    if (d.escalated.length) console.log(`    ⚠ ${d.escalated.join(", ")}`);
+    if (d.unreached.length) console.log(`    · unreached: ${d.unreached.join(", ")}`);
+  }
 }
 
 function printUsage(): void {
   console.error(
     [
       "usage:",
-      '  minion run "<task>"        run a task through the worker blueprint',
-      "  minion run <spec>.md        decompose a spec via the roadmap layer (coming soon)",
-      "  minion run --issue <n>      resolve a GitHub issue (coming soon)",
+      '  minion run "<task>"           run a task through the worker blueprint',
+      "  minion run <spec>.md           decompose a spec and build it (roadmap layer)",
+      "  minion run --issue <n>         resolve a GitHub issue",
       "",
       "flags:",
-      "  --pr    push the branch and open a real PR (default: dry-run, no push)",
+      "  --pr             push the branch and open a real PR (default: dry-run, no push)",
+      "  --max-items <n>  (spec) cap how many backlog items are dispatched",
     ].join("\n"),
   );
 }

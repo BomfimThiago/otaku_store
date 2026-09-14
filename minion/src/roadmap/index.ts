@@ -7,3 +7,9 @@ export {
   type ItemOutcome,
   type RunItem,
 } from "./dispatch.js";
+export {
+  runRoadmap,
+  type RoadmapDeps,
+  type RoadmapOptions,
+  type RoadmapResult,
+} from "./roadmap.js";
