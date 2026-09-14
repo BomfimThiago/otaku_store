@@ -8,10 +8,10 @@
 > the same repo it lives in — Amazon-style UI + real images, full store chrome,
 > accounts, reviews, a light theme — each judged and TDD-tested.
 >
-> The headline: the dashboard exposes a **live trigger** (§8). Hand the Minion a
+> The headline: the dashboard exposes a **live trigger** (§11). Hand the Minion a
 > GitHub issue number from a public URL and it clones, plans, judges, implements,
 > verifies, and opens a **real pull request** — no human in the loop. Proven live:
-> issue #10 → **PR #11** in ~5.5 min (§8).
+> issue #10 → **PR #11** in ~5.5 min.
 >
 > Engineering spec: [`minion/SPEC.md`](../minion/SPEC.md). External tools:
 > [`minion/MCP.md`](../minion/MCP.md). Development narrative + autonomous-loop
@@ -59,13 +59,9 @@ store/STORE_SPEC.md
    → (full build) push develop → open PR develop→main → clean up
 ```
 
-The roadmap layer is real and proven on a capped build (decompose → judge →
-dispatch → auto-merge → finalize PR). In practice, the **shipped OtakuVerso store
-was built through the §2.2 single-worker path** — one feature per PR into
-`develop` (six PRs, #1–#6) — because the parallel auto-merge hit stale-clone
-conflicts on hub files (`App.tsx`, `products.ts`) during a full roadmap run. That
-tradeoff — parallelism where it is safe, serialization where correctness needs it
-(§7) — is itself a deliberate engineering decision, not a limitation papered over.
+Real and proven on a capped build. The shipped OtakuVerso store, though, went
+through the §2.2 single-worker path — one feature per PR into `develop` (#1–#6) —
+a deliberate serialize-for-correctness tradeoff explained in §7.
 
 ### 2.2 Per-item worker blueprint — `minion/src/orchestrator/` + `minion/src/worker/`
 
@@ -218,13 +214,10 @@ engineer's own checkout:
   main` PR** (the one merge that always needs a human, SPEC §4), and removes the
   worktree.
 
-For the shipped OtakuVerso store the same integration target (`develop`) was
-reached one feature at a time: each single-worker run opened a **PR into
-`develop`** (#1–#6), which was reviewed and merged before the next stacked on
-top, then `develop` was promoted to `main` (the human PR). The **product is
-self-contained** — one Fastify service serves the REST API *and* the built React
-SPA from in-memory data (no Docker/Postgres), so "integrated" also means it runs
-from a single `npm start`.
+The shipped store reached `develop` the same way — one PR per feature (#1–#6),
+each merged before the next, then `develop` → `main` (the human PR). The product
+is **self-contained** (one Fastify service serves the API *and* the built SPA from
+in-memory data), so "integrated" also means a single `npm start`.
 
 ---
 

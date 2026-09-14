@@ -17,6 +17,23 @@ resolved GitHub issue #10 into PR **#11** with no human in the loop.
 - **Product spec actually shipped:** [`store/MVP_SPEC.md`](store/MVP_SPEC.md) (self-contained MVP) · original: [`store/STORE_SPEC.md`](store/STORE_SPEC.md)
 - **External tools (MCP):** [`minion/MCP.md`](minion/MCP.md)
 
+## Evidence map — the six capabilities, one artifact each
+
+| Capability | Verify it in seconds |
+|---|---|
+| **1 · Intent + Spec** | [`minion/SPEC.md`](minion/SPEC.md) — FR1–FR25, architecture, Definition of Done, written before the build |
+| **2 · Context engineering** | Fresh clone + fresh agent context per node; two context skills in parallel ([SYSTEM §4](docs/SYSTEM.md)); `settingSources: []` in [`sdk-runner.ts`](minion/src/agent/sdk-runner.ts) |
+| **3 · Orchestration + parallel** | Two layers + 12-node blueprint ([SYSTEM §2/§6/§7](docs/SYSTEM.md)); parallel dispatch — [`docs/screenshots/`](docs/screenshots) |
+| **4 · Harness + back-pressure** | Judges + `commands.{lint,test,e2e}` + evals ([SYSTEM §1](docs/SYSTEM.md)); 236 unit tests + [`store/e2e/`](store/e2e) |
+| **5 · Autonomous loop + recovery** | Issue #10 → run `mu1im01x` → **PR #11**, no human in the loop ([AI-DEV-LOG §2](docs/AI-DEV-LOG.md); [`runs/run-mu1im01x.json`](minion/runs/run-mu1im01x.json)) |
+| **6 · Human as orchestrator** | The integrity call + MVP descope + merge-conflict redirect ([AI-DEV-LOG §5/§6](docs/AI-DEV-LOG.md)); the `develop→main` promotion PR |
+
+**See it:** the store built by the Minion → PRs **#1–#6** (+ live-triggered **#11**, **#13**) · dashboard/store screenshots in [`docs/screenshots/`](docs/screenshots).
+
+## Working product (durable, for judging)
+
+The store runs two durable ways — **locally in two commands** ([Run the store](#run-the-store)) or via the included **[`render.yaml`](render.yaml)** Blueprint (persistent URL). Any `*.trycloudflare.com` demo link is **ephemeral** — live only while the laptop is running — so treat local/Render as the working product.
+
 ---
 
 ## Prerequisites
