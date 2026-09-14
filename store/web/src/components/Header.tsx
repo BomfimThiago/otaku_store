@@ -90,7 +90,7 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-ink-900/90 backdrop-blur">
+    <header className="sticky top-0 z-50 w-full border-b border-ink-700 bg-ink-900/90 shadow-sm backdrop-blur">
       <div className="flex w-full flex-wrap items-center gap-4 px-4 py-3 md:px-8">
         <Link
           to="/"
@@ -115,7 +115,7 @@ export function Header() {
           <button
             type="submit"
             aria-label="Buscar"
-            className="flex h-11 shrink-0 items-center justify-center rounded-r-lg bg-neon-pink px-4 text-ink-950 transition hover:brightness-110"
+            className="flex h-11 shrink-0 items-center justify-center rounded-r-lg bg-neon-pink px-4 text-white transition hover:brightness-110"
           >
             <SearchIcon />
           </button>
@@ -151,7 +151,7 @@ export function Header() {
             <CartIcon />
             Carrinho
             {itemCount > 0 && (
-              <span className="rounded-full bg-neon-pink px-2 py-0.5 text-xs font-bold text-ink-950 tabular-nums">
+              <span className="rounded-full bg-neon-pink px-2 py-0.5 text-xs font-bold text-white tabular-nums">
                 {itemCount}
               </span>
             )}
