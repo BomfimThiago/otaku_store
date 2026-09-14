@@ -214,6 +214,26 @@ describe('App routing', () => {
     });
   });
 
+  it('renders the about page at /sobre', async () => {
+    renderAt('/sobre');
+
+    expect(await screen.findByRole('heading', { name: /sobre nós/i })).toBeInTheDocument();
+  });
+
+  it('links the footer Sobre nós entry to /sobre and navigates there', async () => {
+    const user = userEvent.setup();
+    renderAt('/');
+
+    await screen.findByRole('heading', { name: /catálogo/i });
+
+    const aboutLink = screen.getByRole('link', { name: /sobre nós/i });
+    expect(aboutLink).toHaveAttribute('href', '/sobre');
+
+    await user.click(aboutLink);
+
+    expect(await screen.findByRole('heading', { name: /sobre nós/i })).toBeInTheDocument();
+  });
+
   describe('/register', () => {
     it('renders the register form', async () => {
       renderAt('/register');

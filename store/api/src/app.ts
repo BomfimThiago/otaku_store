@@ -40,7 +40,7 @@ export function buildApp(opts: FastifyServerOptions = {}) {
   app.register(authRoute, { usersStore });
   app.register(reviewsRoute, { usersStore, reviewsStore });
 
-  // Hashed JS/CSS assets; SPA routes (/, /p/:slug, /cart, /login, /register)
+  // Hashed JS/CSS assets; SPA routes (/, /p/:slug, /cart, /login, /register, /sobre)
   // fall through to the not-found handler, which returns index.html.
   if (existsSync(join(SPA_DIST, 'assets'))) {
     app.register(fastifyStatic, { root: join(SPA_DIST, 'assets'), prefix: '/assets/' });

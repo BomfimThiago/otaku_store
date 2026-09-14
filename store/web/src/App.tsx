@@ -6,6 +6,7 @@ import { ProductPage } from './pages/ProductPage.js';
 import { CartPage } from './pages/CartPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { RegisterPage } from './pages/RegisterPage.js';
+import { AboutPage } from './pages/AboutPage.js';
 
 export function App() {
   return (
@@ -18,6 +19,7 @@ export function App() {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/sobre" element={<AboutPage />} />
         </Routes>
       </div>
       <Footer />

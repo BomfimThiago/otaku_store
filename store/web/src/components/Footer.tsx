@@ -58,7 +58,7 @@ export function Footer() {
           <p className="text-sm font-semibold text-fg">Institucional</p>
           <ul className="mt-2 space-y-1 text-sm text-muted">
             <li>
-              <Link to="/" className="hover:text-fg">
+              <Link to="/sobre" className="hover:text-fg">
                 Sobre nós
               </Link>
             </li>
