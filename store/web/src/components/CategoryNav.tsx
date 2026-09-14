@@ -17,7 +17,7 @@ export function CategoryNav() {
     isHome && (slug === null ? activeCategory === null : activeCategory === slug);
 
   return (
-    <nav aria-label="Categorias" className="w-full border-t border-ink-800">
+    <nav aria-label="Categorias" className="w-full border-t border-ink-700">
       <ul className="flex w-full items-center gap-4 overflow-x-auto px-4 md:px-8">
         <li>
           <Link

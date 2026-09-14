@@ -124,7 +124,7 @@ export function ReviewsSection({ slug }: { slug: string }) {
                 aria-pressed={rating === n}
                 aria-label={`${n} estrelas`}
                 onClick={() => setRating(n)}
-                className={`text-xl leading-none ${n <= rating ? 'text-neon-cyan' : 'text-ink-700'}`}
+                className={`text-xl leading-none ${n <= rating ? 'text-neon-cyan' : 'text-ink-600'}`}
               >
                 {n <= rating ? '★' : '☆'}
               </button>
@@ -147,7 +147,7 @@ export function ReviewsSection({ slug }: { slug: string }) {
           <button
             type="submit"
             disabled={submitting || rating === 0 || !comment.trim()}
-            className="w-fit rounded-lg bg-neon-pink px-5 py-2 font-semibold text-ink-950 transition hover:brightness-110 disabled:opacity-60"
+            className="w-fit rounded-lg bg-neon-pink px-5 py-2 font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
           >
             {submitting ? 'Enviando…' : 'Enviar avaliação'}
           </button>

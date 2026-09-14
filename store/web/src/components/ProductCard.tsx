@@ -50,7 +50,7 @@ export function ProductCard({ product }: { product: Product }) {
           type="button"
           onClick={handleAdd}
           disabled={adding || !inStock}
-          className="mt-auto w-full rounded-lg bg-neon-pink px-3 py-2 text-sm font-semibold text-ink-950 transition hover:brightness-110 disabled:opacity-60"
+          className="mt-auto w-full rounded-lg bg-neon-pink px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
         >
           {adding ? 'Adicionando…' : 'Adicionar ao carrinho'}
         </button>

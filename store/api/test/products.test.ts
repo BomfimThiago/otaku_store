@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createTestApp } from './helpers/app.js';
 import { products } from '../src/data/products.js';
+import { SEED_REVIEWS } from '../src/data/reviews.js';
 
 describe('GET /api/products', () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
@@ -171,11 +172,14 @@ describe('GET /api/products/:slug', () => {
     app = await createTestApp();
 
     const target = products[0]!;
+    const seedForTarget = SEED_REVIEWS.filter((review) => review.productSlug === target.slug);
+    const seedSum = seedForTarget.reduce((total, review) => total + review.rating, 0);
+    const ratingAverage = seedForTarget.length === 0 ? 0 : Math.round((seedSum / seedForTarget.length) * 10) / 10;
 
     const response = await app.inject({ method: 'GET', url: `/api/products/${target.slug}` });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ ...target, ratingAverage: 0, ratingCount: 0 });
+    expect(response.json()).toEqual({ ...target, ratingAverage, ratingCount: seedForTarget.length });
   });
 
   it('returns a 404 JSON body for an unknown slug', async () => {

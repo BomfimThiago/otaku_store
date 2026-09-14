@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createTestApp } from './helpers/app.js';
 import { products } from '../src/data/products.js';
+import { SEED_REVIEWS } from '../src/data/reviews.js';
 
 type App = Awaited<ReturnType<typeof createTestApp>>;
 
@@ -29,6 +30,12 @@ async function registerAndLogin(app: App, overrides: Partial<{ name: string; ema
 }
 
 const slug = products[0]!.slug;
+const seedForSlug = SEED_REVIEWS.filter((review) => review.productSlug === slug);
+const seedNewestFirst = [...seedForSlug].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+const seedCount = seedForSlug.length;
+const seedSum = seedForSlug.reduce((total, review) => total + review.rating, 0);
+const seedAverage = Math.round((seedSum / seedCount) * 10) / 10;
+const unseededSlug = 'poster-demon-slayer-a2';
 
 describe('GET /api/products/:slug/reviews', () => {
   let app: App;
@@ -45,10 +52,24 @@ describe('GET /api/products/:slug/reviews', () => {
     expect(response.statusCode).toBe(404);
   });
 
-  it('returns an empty list with average 0 and count 0 when there are no reviews', async () => {
+  it('returns the seeded reviews newest first with the average and count from the seed', async () => {
     app = await createTestApp();
 
     const response = await app.inject({ method: 'GET', url: `/api/products/${slug}/reviews` });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.reviews.map((review: { id: string }) => review.id)).toEqual(
+      seedNewestFirst.map((review) => review.id),
+    );
+    expect(body.average).toBe(seedAverage);
+    expect(body.count).toBe(seedCount);
+  });
+
+  it('returns an empty list with average 0 and count 0 for a real slug with no seeded reviews', async () => {
+    app = await createTestApp();
+
+    const response = await app.inject({ method: 'GET', url: `/api/products/${unseededSlug}/reviews` });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ reviews: [], average: 0, count: 0 });
@@ -196,21 +217,24 @@ describe('POST /api/products/:slug/reviews', () => {
       payload: { rating: 2, comment: 'Podia ser melhor.' },
     });
 
+    const expectedCount = seedCount + 2;
+    const expectedAverage = Math.round(((seedSum + 4 + 2) / expectedCount) * 10) / 10;
+
     const listResponse = await app.inject({ method: 'GET', url: `/api/products/${slug}/reviews` });
     expect(listResponse.statusCode).toBe(200);
     const listBody = listResponse.json();
-    expect(listBody.reviews).toHaveLength(2);
+    expect(listBody.reviews).toHaveLength(expectedCount);
     expect(listBody.reviews[0].userName).toBe('Grace Hopper');
     expect(listBody.reviews[1].userName).toBe('Ada Lovelace');
-    expect(listBody.average).toBe(3);
-    expect(listBody.count).toBe(2);
+    expect(listBody.average).toBe(expectedAverage);
+    expect(listBody.count).toBe(expectedCount);
 
     const productsResponse = await app.inject({ method: 'GET', url: '/api/products' });
     const productsBody = productsResponse.json();
     const listedProduct = productsBody.find((p: { slug: string }) => p.slug === slug);
-    expect(listedProduct).toMatchObject({ ratingAverage: 3, ratingCount: 2 });
+    expect(listedProduct).toMatchObject({ ratingAverage: expectedAverage, ratingCount: expectedCount });
 
     const detailResponse = await app.inject({ method: 'GET', url: `/api/products/${slug}` });
-    expect(detailResponse.json()).toMatchObject({ ratingAverage: 3, ratingCount: 2 });
+    expect(detailResponse.json()).toMatchObject({ ratingAverage: expectedAverage, ratingCount: expectedCount });
   });
 });

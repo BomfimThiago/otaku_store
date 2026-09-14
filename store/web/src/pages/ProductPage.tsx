@@ -152,7 +152,7 @@ export function ProductPage() {
             <button
               onClick={handleAdd}
               disabled={adding || !inStock}
-              className="mt-5 w-full rounded-lg bg-neon-pink px-5 py-3 font-semibold text-ink-950 transition hover:brightness-110 disabled:opacity-60"
+              className="mt-5 w-full rounded-lg bg-neon-pink px-5 py-3 font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
             >
               {adding ? 'Adicionando…' : 'Adicionar ao carrinho'}
             </button>
