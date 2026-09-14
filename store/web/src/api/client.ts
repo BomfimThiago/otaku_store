@@ -2,9 +2,12 @@ import type {
   AddToCartInput,
   ApiErrorBody,
   Cart,
+  LoginInput,
   Product,
   ProductListParams,
+  RegisterInput,
   UpdateCartItemInput,
+  User,
 } from './types.js';
 
 export class ApiError extends Error {
@@ -97,4 +100,28 @@ export function removeCartItem(itemId: string): Promise<void> {
   return request<void>(`/api/cart/${encodeURIComponent(itemId)}`, {
     method: 'DELETE',
   });
+}
+
+export function register(input: RegisterInput): Promise<User> {
+  return request<User>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function login(input: LoginInput): Promise<User> {
+  return request<User>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function logout(): Promise<void> {
+  return request<void>('/api/auth/logout', {
+    method: 'POST',
+  });
+}
+
+export function me(): Promise<User> {
+  return request<User>('/api/auth/me');
 }

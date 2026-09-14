@@ -55,3 +55,20 @@ export interface ApiErrorBody {
   statusCode: number;
   details?: { path: string; code: string; message: string }[];
 }
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}

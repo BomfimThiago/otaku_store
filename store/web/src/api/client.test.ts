@@ -6,6 +6,10 @@ import {
   getCart,
   getProduct,
   listProducts,
+  login,
+  logout,
+  me,
+  register,
   removeCartItem,
   updateCartItem,
 } from './client.js';
@@ -147,5 +151,62 @@ describe('api client', () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
     await expect(removeCartItem('i1')).resolves.toBeUndefined();
+  });
+
+  it('registers a user', async () => {
+    const fetchMock = vi.mocked(fetch);
+    const user = { id: 'u1', name: 'Ada', email: 'ada@example.com' };
+    fetchMock.mockResolvedValueOnce(jsonResponse(user, { status: 201 }));
+
+    const input = { name: 'Ada', email: 'ada@example.com', password: 'password1' };
+    await expect(register(input)).resolves.toEqual(user);
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/register');
+    expect(init?.method).toBe('POST');
+    expect(init?.credentials).toBe('include');
+    expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json' });
+    expect(init?.body).toBe(JSON.stringify(input));
+  });
+
+  it('logs a user in', async () => {
+    const fetchMock = vi.mocked(fetch);
+    const user = { id: 'u1', name: 'Ada', email: 'ada@example.com' };
+    fetchMock.mockResolvedValueOnce(jsonResponse(user));
+
+    const input = { email: 'ada@example.com', password: 'password1' };
+    await expect(login(input)).resolves.toEqual(user);
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/login');
+    expect(init?.method).toBe('POST');
+    expect(init?.credentials).toBe('include');
+    expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json' });
+    expect(init?.body).toBe(JSON.stringify(input));
+  });
+
+  it('logs a user out', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    await expect(logout()).resolves.toBeUndefined();
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/logout');
+    expect(init?.method).toBe('POST');
+    expect(init?.credentials).toBe('include');
+  });
+
+  it('gets the current user', async () => {
+    const fetchMock = vi.mocked(fetch);
+    const user = { id: 'u1', name: 'Ada', email: 'ada@example.com' };
+    fetchMock.mockResolvedValueOnce(jsonResponse(user));
+
+    await expect(me()).resolves.toEqual(user);
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/auth/me');
+    expect(init?.method ?? 'GET').toBe('GET');
+    expect(init?.credentials).toBe('include');
   });
 });

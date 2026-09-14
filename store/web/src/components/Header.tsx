@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useAuth } from '../auth/AuthContext.js';
 import { useCart } from '../cart/CartContext.js';
+import { useToast } from '../toast/ToastProvider.js';
 import { CategoryNav } from './CategoryNav.js';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -39,6 +41,8 @@ function CartIcon() {
 
 export function Header() {
   const { itemCount } = useCart();
+  const { user, loading, logout } = useAuth();
+  const toast = useToast();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -79,6 +83,12 @@ export function Header() {
     navigate(trimmed ? `/?q=${encodeURIComponent(trimmed)}` : '/');
   };
 
+  const handleLogout = async () => {
+    await logout();
+    toast.show('Você saiu da sua conta', { variant: 'success' });
+    navigate('/');
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full bg-ink-900/90 backdrop-blur">
       <div className="flex w-full flex-wrap items-center gap-4 px-4 py-3 md:px-8">
@@ -112,10 +122,27 @@ export function Header() {
         </form>
 
         <div className="flex shrink-0 items-center gap-4">
-          <Link to="/login" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
-            <UserIcon />
-            Entrar
-          </Link>
+          {!loading &&
+            (user ? (
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 text-sm text-muted">
+                  <UserIcon />
+                  {user.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="text-sm text-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-cyan"
+                >
+                  Sair
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
+                <UserIcon />
+                Entrar
+              </Link>
+            ))}
 
           <Link
             to="/cart"
