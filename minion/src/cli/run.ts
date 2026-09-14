@@ -20,6 +20,7 @@ import { Orchestrator, type WorkerResult, type WorkerStatus } from "../orchestra
 import { StateStore } from "../persistence/index.js";
 import { GitRepoOps, type PrResult, type RepoOps } from "../repo/index.js";
 import {
+  Integrator,
   runRoadmap,
   type ItemOutcome,
   type RoadmapResult,
@@ -90,18 +91,40 @@ interface SpecDeps {
 
 async function runSpec(args: ParsedArgs, deps: SpecDeps): Promise<void> {
   const specContent = readFileSync(path.resolve(deps.repoRoot, args.workItem), "utf8");
+  const integrationBranch = deps.config.repo.integrationBranch;
+  const integrationDir = path.join(deps.repoRoot, "minion", "integration");
+  const integrator = new Integrator(deps.repoRoot, integrationBranch, integrationDir);
+  await integrator.prepare(deps.config.repo.defaultBranch);
+
   console.log(
-    `\n▶ roadmap: building from ${args.workItem}${args.openPr ? "" : "  (dry-run: no push/PR)"}` +
+    `\n▶ roadmap: building ${args.workItem} → auto-merge into '${integrationBranch}'` +
       `${args.maxItems !== undefined ? `  (max ${args.maxItems} items)` : ""}\n`,
   );
 
-  // Each ready item runs through the worker blueprint. The dispatch loop owns the
-  // cross-item lock table; each worker gets a fresh scheduler (its own schedule
-  // node locks nothing pre-plan), so the two layers never collide.
+  // Items base off the integration branch, so each builds on prior merged work.
+  const itemConfig: MinionConfig = {
+    ...deps.config,
+    repo: { ...deps.config.repo, defaultBranch: integrationBranch },
+  };
+
+  // Workers run in parallel, but the single integration worktree needs serial
+  // merges — chain them so only one merge touches `develop` at a time.
+  let mergeChain: Promise<unknown> = Promise.resolve();
+
   const runItem = async (item: BacklogItem): Promise<ItemOutcome> => {
     const run = newRunFromItem(item, deps.repoName, deps.config.repo.source);
-    const result = await runWorker(run, deps.store, deps.handlers, deps.config);
-    return toItemOutcome(result.status);
+    const result = await runWorker(run, deps.store, deps.handlers, itemConfig);
+    if (result.status !== "done") return toItemOutcome(result.status);
+
+    const merge = mergeChain.then(() => integrator.merge(run.cloneDir, run.branch));
+    mergeChain = merge.catch(() => undefined);
+    const merged = await merge;
+    if (!merged.ok) {
+      console.log(`  [integrate] ${item.id}: merge ${merged.conflict ? "conflict" : "failed"} — ${truncate(merged.output, 80)}`);
+      return merged.conflict ? "escalated" : "failed";
+    }
+    console.log(`  [integrate] ${item.id} → ${integrationBranch}`);
+    return "done";
   };
 
   const result = await runRoadmap(
@@ -119,6 +142,7 @@ async function runSpec(args: ParsedArgs, deps: SpecDeps): Promise<void> {
   );
 
   printRoadmapResult(result);
+  console.log(`\n  ${integrationBranch} @ ${await integrator.head()} — built product in ${integrationDir}`);
   process.exitCode = result.status === "delivered" ? 0 : 1;
 }
 

@@ -13,3 +13,4 @@ export {
   type RoadmapOptions,
   type RoadmapResult,
 } from "./roadmap.js";
+export { Integrator, type MergeResult } from "./integrate.js";

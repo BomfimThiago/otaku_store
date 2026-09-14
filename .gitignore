@@ -33,9 +33,10 @@ Thumbs.db
 coverage/
 .cache/
 
-# Minion runtime artifacts (state + isolated clones); fixtures are committed separately
+# Minion runtime artifacts (state + isolated clones + integration worktree)
 minion/runs/
 minion/clones/
+minion/integration/
 
 # Local tooling artifacts (Playwright captures, ad-hoc screenshots)
 .playwright-mcp/
