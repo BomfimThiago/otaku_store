@@ -20,8 +20,15 @@ the plan faithfully and quickly.
 - **Do not add dependencies** that the plan did not declare.
 - On **rework**, you are given the Judge's critique. Address every point in it
   specifically; do not reintroduce previously-fixed issues.
+- **Frontend work ships an end-to-end test.** When the plan touches the frontend
+  (`store/web/**`) and lists an E2E case (`store/e2e/cases/<feature>.e2e.mjs`),
+  write it: `export default async ({ base, assert }) => { … }`, using
+  `fetch(base + '/api/...')` and `fetch(base + '/<route>')` assertions that cover
+  the new behavior (follow `store/e2e/cases/smoke.e2e.mjs`). The E2E suite runs
+  after you (`commands.e2e`); if it fails, you are sent back to fix it.
 
 ## Done means
 
-The change compiles, follows the plan, and is ready for the harness (lint, tests,
-evals). Keep the diff minimal and focused on the item.
+The change compiles, follows the plan, is covered (unit tests, plus an E2E case
+for frontend work), and is ready for the harness (lint, tests, evals, E2E). Keep
+the diff minimal and focused on the item.

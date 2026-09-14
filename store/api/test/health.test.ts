@@ -26,10 +26,12 @@ describe('error contract', () => {
     await app.close();
   });
 
-  it('returns a 404 JSON body for unknown routes', async () => {
+  it('returns a 404 JSON body for unknown API routes', async () => {
     app = await createTestApp();
 
-    const response = await app.inject({ method: 'GET', url: '/does-not-exist' });
+    // Non-API GET routes fall through to the SPA (client-side routing); the JSON
+    // 404 contract applies to unknown /api/* routes.
+    const response = await app.inject({ method: 'GET', url: '/api/does-not-exist' });
 
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({ error: 'Not Found', statusCode: 404 });

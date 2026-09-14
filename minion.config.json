@@ -7,9 +7,14 @@
   "parallelism": 1,
   "commands": {
     "lint": "cd store && npm install --no-audit --no-fund --silent && npm run typecheck",
-    "test": "echo 'unit tests are written and run within each item (TDD)'"
+    "test": "cd store && npm run test",
+    "e2e": "cd store && npm run test:e2e"
   },
   "frontendGlobs": ["store/web/**"],
-  "evals": [],
+  "evals": [
+    { "name": "diff-size", "options": { "maxFiles": 30 } },
+    { "name": "no-debug-artifacts" },
+    { "name": "tests-with-frontend" }
+  ],
   "attemptCeiling": 2
 }
