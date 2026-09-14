@@ -316,6 +316,10 @@
   .trigger-msg{ margin-top:8px; font-size:0.78rem; min-height:1em; color:var(--dim); }
   .trigger-msg.ok{ color:var(--accent); }
   .trigger-msg.err{ color:#ff6b81; }
+  .killbtn{ margin-top:8px; width:100%; background:transparent; color:#ff6b81; border:1px solid #ff6b81;
+    border-radius:8px; padding:7px 10px; font:inherit; font-weight:600; cursor:pointer; }
+  .killbtn:hover{ background:rgba(255,107,129,0.12); }
+  .killbtn:disabled{ opacity:0.5; cursor:default; }
 
   .parwrap{ margin-top:9px; }
   .parhint{ font-size:0.66rem; letter-spacing:0.05em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
@@ -352,6 +356,7 @@
         <button id="triggerbtn" type="submit">Rodar</button>
       </div>
       <div id="triggermsg" class="trigger-msg"></div>
+      <button id="killbtn" type="button" class="killbtn" hidden>■ Parar run atual</button>
     </form>
 
     <div class="eyebrow">Runs</div>
@@ -598,6 +603,8 @@
     }
     renderTopStats();
     renderSidebar();
+    const kb = document.getElementById("killbtn");
+    if (kb) kb.hidden = !runs.some((r) => r.status === "running");
     if (selectedId) await refreshSelected();
     else document.getElementById("main").innerHTML =
       '<div class="empty">nenhum run ainda — rode <code>minion run "…"</code> em outro terminal</div>';
@@ -637,6 +644,26 @@
         msg.className = "trigger-msg err"; msg.textContent = "falha de rede";
       } finally {
         btn.disabled = false;
+      }
+    });
+
+    const killbtn = document.getElementById("killbtn");
+    killbtn?.addEventListener("click", async () => {
+      killbtn.disabled = true;
+      try {
+        const r = await fetch("/api/kill", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token: new URLSearchParams(location.search).get("token") || undefined }),
+        });
+        const data = await r.json().catch(() => ({}));
+        msg.className = r.ok ? "trigger-msg" : "trigger-msg err";
+        msg.textContent = data.message || data.error || "";
+        await tick();
+      } catch {
+        msg.className = "trigger-msg err"; msg.textContent = "falha de rede";
+      } finally {
+        killbtn.disabled = false;
       }
     });
   }

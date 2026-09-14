@@ -33,6 +33,9 @@ export interface DashboardOptions {
 // spawning unbounded agent builds. Deterministic guards, no LLM.
 let triggerActive = false;
 let triggeredCount = 0;
+// The current triggered run's child (spawned detached, so we can kill its whole
+// process group from POST /api/kill — the human-as-orchestrator stop button).
+let activeChild: ReturnType<typeof spawn> | null = null;
 
 export interface RunningDashboard {
   url: string;
@@ -83,6 +86,11 @@ async function handle(
 
   if (p === "/api/trigger") {
     await handleTrigger(req, res, opts);
+    return;
+  }
+
+  if (p === "/api/kill") {
+    await handleKill(req, res, opts);
     return;
   }
 
@@ -154,13 +162,15 @@ async function handleTrigger(
     cwd: opts.projectDir,
     env: process.env,
     stdio: "ignore",
+    detached: true, // own process group, so /api/kill can stop the whole tree
   });
-  child.on("exit", () => {
+  activeChild = child;
+  const clear = (): void => {
     triggerActive = false;
-  });
-  child.on("error", () => {
-    triggerActive = false;
-  });
+    if (activeChild === child) activeChild = null;
+  };
+  child.on("exit", clear);
+  child.on("error", clear);
 
   sendJson(res, 202, {
     ok: true,
@@ -168,6 +178,48 @@ async function handleTrigger(
     message: `Minion iniciado na issue #${issue} — acompanhe o run abaixo`,
     remaining: cap - triggeredCount,
   });
+}
+
+/**
+ * POST /api/kill — stop the active triggered run (human-as-orchestrator override).
+ * Kills the child's whole process group. Token-gated like the trigger.
+ */
+async function handleKill(
+  req: IncomingMessage,
+  res: ServerResponse,
+  opts: DashboardOptions,
+): Promise<void> {
+  if (!opts.projectDir) {
+    sendJson(res, 404, { error: "trigger disabled" });
+    return;
+  }
+  if (req.method !== "POST") {
+    sendJson(res, 405, { error: "use POST" });
+    return;
+  }
+  let body: { token?: unknown } = {};
+  try {
+    body = JSON.parse(await readBody(req)) as { token?: unknown };
+  } catch {
+    /* empty body is fine */
+  }
+  const requiredToken = process.env.TRIGGER_TOKEN;
+  if (requiredToken && body.token !== requiredToken) {
+    sendJson(res, 401, { error: "token de acesso inválido ou ausente" });
+    return;
+  }
+  if (!activeChild || activeChild.pid === undefined) {
+    sendJson(res, 404, { error: "nenhum run em andamento" });
+    return;
+  }
+  try {
+    process.kill(-activeChild.pid, "SIGKILL"); // negative pid = the whole group
+  } catch {
+    /* already gone */
+  }
+  triggerActive = false;
+  activeChild = null;
+  sendJson(res, 202, { ok: true, message: "run interrompido" });
 }
 
 /** Read a request body with a small size cap (trigger payloads are tiny). */
