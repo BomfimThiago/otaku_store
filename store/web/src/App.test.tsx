@@ -160,6 +160,20 @@ describe('App routing', () => {
     expect(screen.queryByText(registeredUser.name)).not.toBeInTheDocument();
   });
 
+  it('links the footer Fale conosco to /contato', async () => {
+    const user = userEvent.setup();
+    renderAt('/');
+
+    await screen.findByRole('heading', { name: /catálogo/i });
+
+    const contactLink = screen.getByRole('link', { name: /fale conosco/i });
+    expect(contactLink).toHaveAttribute('href', '/contato');
+
+    await user.click(contactLink);
+
+    expect(await screen.findByRole('heading', { name: /fale conosco/i })).toBeInTheDocument();
+  });
+
   describe('/login', () => {
     it('renders the login form', async () => {
       renderAt('/login');
@@ -236,6 +250,87 @@ describe('App routing', () => {
       await user.click(screen.getByRole('button', { name: /criar conta/i }));
 
       expect(await screen.findByText(/ao menos 8 caracteres/i)).toBeInTheDocument();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('/contato', () => {
+    it('renders the contact form', async () => {
+      renderAt('/contato');
+
+      expect(await screen.findByRole('heading', { name: /fale conosco/i })).toBeInTheDocument();
+      expect(screen.getByLabelText(/nome/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/e-mail/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/mensagem/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /enviar/i })).toBeInTheDocument();
+    });
+
+    it('shows validation errors on an empty submit without calling fetch', async () => {
+      const user = userEvent.setup();
+      renderAt('/contato');
+
+      await screen.findByRole('heading', { name: /fale conosco/i });
+      const fetchMock = vi.mocked(fetch);
+      fetchMock.mockClear();
+
+      await user.click(screen.getByRole('button', { name: /enviar/i }));
+
+      expect(await screen.findByText('Informe seu nome.')).toBeInTheDocument();
+      expect(screen.getByText('Informe seu e-mail.')).toBeInTheDocument();
+      expect(screen.getByText('Informe sua mensagem.')).toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toHaveTextContent(/mensagem enviada/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('shows a validation error for an invalid email', async () => {
+      const user = userEvent.setup();
+      renderAt('/contato');
+
+      await screen.findByRole('heading', { name: /fale conosco/i });
+
+      await user.type(screen.getByLabelText(/nome/i), 'Ada Lovelace');
+      await user.type(screen.getByLabelText(/e-mail/i), 'not-an-email');
+      await user.type(screen.getByLabelText(/mensagem/i), 'Gostaria de saber mais sobre os produtos.');
+      await user.click(screen.getByRole('button', { name: /enviar/i }));
+
+      expect(await screen.findByText('Informe um e-mail válido.')).toBeInTheDocument();
+    });
+
+    it('shows a validation error for a short message', async () => {
+      const user = userEvent.setup();
+      renderAt('/contato');
+
+      await screen.findByRole('heading', { name: /fale conosco/i });
+
+      await user.type(screen.getByLabelText(/nome/i), 'Ada Lovelace');
+      await user.type(screen.getByLabelText(/e-mail/i), 'ada@example.com');
+      await user.type(screen.getByLabelText(/mensagem/i), 'oi');
+      await user.click(screen.getByRole('button', { name: /enviar/i }));
+
+      expect(await screen.findByText('A mensagem deve ter pelo menos 10 caracteres.')).toBeInTheDocument();
+    });
+
+    it('submits successfully, shows a toast and resets the form without calling fetch', async () => {
+      const user = userEvent.setup();
+      renderAt('/contato');
+
+      await screen.findByRole('heading', { name: /fale conosco/i });
+      const fetchMock = vi.mocked(fetch);
+      fetchMock.mockClear();
+
+      await user.type(screen.getByLabelText(/nome/i), 'Ada Lovelace');
+      await user.type(screen.getByLabelText(/e-mail/i), 'ada@example.com');
+      await user.type(screen.getByLabelText(/mensagem/i), 'Gostaria de saber mais sobre os produtos.');
+      await user.click(screen.getByRole('button', { name: /enviar/i }));
+
+      expect(await screen.findByText('Mensagem enviada! Responderemos em breve.')).toBeInTheDocument();
+
+      expect(screen.getByLabelText(/nome/i)).toHaveValue('');
+      expect(screen.getByLabelText(/e-mail/i)).toHaveValue('');
+      expect(screen.getByLabelText(/mensagem/i)).toHaveValue('');
+      expect(screen.queryByText('Informe seu nome.')).not.toBeInTheDocument();
+      expect(screen.queryByText('Informe seu e-mail.')).not.toBeInTheDocument();
+      expect(screen.queryByText('Informe sua mensagem.')).not.toBeInTheDocument();
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });

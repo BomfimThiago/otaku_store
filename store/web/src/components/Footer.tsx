@@ -85,7 +85,7 @@ export function Footer() {
           <p className="text-sm font-semibold text-fg">Contato</p>
           <ul className="mt-2 space-y-1 text-sm text-muted">
             <li>
-              <Link to="/" className="hover:text-fg">
+              <Link to="/contato" className="hover:text-fg">
                 Fale conosco
               </Link>
             </li>
