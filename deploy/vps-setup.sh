@@ -89,6 +89,9 @@ After=network.target
 WorkingDirectory=$APP_DIR/minion
 EnvironmentFile=$APP_DIR/.env
 Environment=MINION_REPO_SOURCE=$REPO_URL
+# The Claude Agent SDK refuses --dangerously-skip-permissions as root unless the
+# environment is marked a sandbox. This box is a dedicated sandbox for the Minion.
+Environment=IS_SANDBOX=1
 ExecStart=/usr/bin/npx tsx src/index.ts dashboard --port $CONSOLE_PORT --enable-trigger
 Restart=always
 RestartSec=3
