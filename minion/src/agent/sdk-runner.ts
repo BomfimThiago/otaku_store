@@ -33,6 +33,8 @@ interface Definition {
   systemPrompt: string;
   model?: string; // "opus" | "sonnet" — SDK resolves the alias
   allowedTools: string[];
+  /** Skills referenced in frontmatter, inlined into the system prompt. */
+  skills: string[];
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
@@ -90,38 +92,59 @@ export class SdkAgentRunner implements AgentRunner {
     const cached = this.cache.get(name);
     if (cached !== undefined) return cached;
 
-    const agentPath = join(this.options.projectDir, ".claude", "agents", `${name}.md`);
-    const skillPath = join(this.options.projectDir, ".claude", "skills", name, "SKILL.md");
-    const path = existsSync(agentPath)
-      ? agentPath
-      : existsSync(skillPath)
-        ? skillPath
-        : undefined;
-    if (path === undefined) {
-      throw new Error(
-        `no agent or skill named "${name}" under ${this.options.projectDir}/.claude`,
-      );
-    }
-
-    const def = parseDefinition(readFileSync(path, "utf8"));
+    const parsed = parseDefinition(readFileSync(this.resolve(name), "utf8"));
+    // An agent that declares `skills: [...]` needs those skill bodies inlined —
+    // the SDK isn't loading them from disk (cwd is the clone, not this project),
+    // and a judge referencing "the judging skill" must actually see its rubric.
+    const skillBlocks = parsed.skills.map(
+      (s) => `\n\n## Skill: ${s}\n\n${parseDefinition(readFileSync(this.resolveSkill(s), "utf8")).systemPrompt}`,
+    );
+    const def: Definition = {
+      ...parsed,
+      systemPrompt: parsed.systemPrompt + skillBlocks.join(""),
+    };
     this.cache.set(name, def);
     return def;
+  }
+
+  /** An agent (`.claude/agents/<name>.md`) or a top-level skill (`.claude/skills/<name>/SKILL.md`). */
+  private resolve(name: string): string {
+    const agentPath = join(this.options.projectDir, ".claude", "agents", `${name}.md`);
+    if (existsSync(agentPath)) return agentPath;
+    const skillPath = this.resolveSkill(name, false);
+    if (existsSync(skillPath)) return skillPath;
+    throw new Error(`no agent or skill named "${name}" under ${this.options.projectDir}/.claude`);
+  }
+
+  private resolveSkill(name: string, checked = true): string {
+    const skillPath = join(this.options.projectDir, ".claude", "skills", name, "SKILL.md");
+    if (checked && !existsSync(skillPath)) {
+      throw new Error(`referenced skill "${name}" not found at ${skillPath}`);
+    }
+    return skillPath;
   }
 }
 
 function parseDefinition(raw: string): Definition {
   const m = FRONTMATTER.exec(raw);
-  if (m === null) return { systemPrompt: raw.trim(), allowedTools: [] };
+  if (m === null) return { systemPrompt: raw.trim(), allowedTools: [], skills: [] };
   const front = m[1] ?? "";
   const body = (m[2] ?? "").trim();
-  const toolsLine = field(front, "tools") ?? field(front, "allowed-tools");
-  const allowedTools = toolsLine
-    ? toolsLine.split(",").map((t) => t.trim()).filter((t) => t.length > 0)
-    : [];
+  const allowedTools = list(field(front, "tools") ?? field(front, "allowed-tools"));
+  const skills = list(field(front, "skills"));
   const model = field(front, "model");
-  return model !== undefined
-    ? { systemPrompt: body, model, allowedTools }
-    : { systemPrompt: body, allowedTools };
+  const base = { systemPrompt: body, allowedTools, skills };
+  return model !== undefined ? { ...base, model } : base;
+}
+
+/** Parse a frontmatter list: `a, b`, `[a, b]`, or a single value. */
+function list(value: string | undefined): string[] {
+  if (value === undefined) return [];
+  return value
+    .replace(/^\[|\]$/g, "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
 }
 
 function field(frontmatter: string, key: string): string | undefined {

@@ -24,6 +24,8 @@ export interface PrResult {
 export interface RepoOps {
   isolate(runId: string, source: string, baseBranch: string): Promise<Isolation>;
   changedFiles(cloneDir: string): Promise<string[]>;
+  /** Stage everything and commit; returns false if there was nothing to commit. */
+  commitAll(cloneDir: string, message: string): Promise<boolean>;
   rebaseOntoBase(cloneDir: string, baseBranch: string): Promise<RebaseResult>;
   openPr(cloneDir: string, branch: string, base: string, title: string, body: string): Promise<PrResult>;
   teardown(cloneDir: string): Promise<void>;
@@ -47,6 +49,15 @@ export class GitRepoOps implements RepoOps {
       .split("\n")
       .filter((l) => l.length > 3)
       .map((l) => l.slice(3).trim());
+  }
+
+  async commitAll(cloneDir: string, message: string): Promise<boolean> {
+    await execRun("git", ["-C", cloneDir, "add", "-A"]);
+    const staged = await execRun("git", ["-C", cloneDir, "diff", "--cached", "--quiet"]);
+    if (staged.code === 0) return false; // exit 0 => no staged changes
+    const r = await execRun("git", ["-C", cloneDir, "commit", "-m", message]);
+    if (r.code !== 0) throw new Error(`git commit failed: ${r.stderr.trim()}`);
+    return true;
   }
 
   async rebaseOntoBase(cloneDir: string, baseBranch: string): Promise<RebaseResult> {

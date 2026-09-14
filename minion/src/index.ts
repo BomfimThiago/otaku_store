@@ -1,15 +1,38 @@
 /**
- * Minion entry point.
+ * Minion entry point — `minion <command> [args]`.
  *
- * Wiring (orchestrator, scheduler, dispatch loop) lands in later steps. For now
- * this only exercises the toolchain and the declarative blueprint.
+ * The only command today is `run` (SPEC §5, FR1): it accepts a work item (task,
+ * spec, or issue) and drives it through the blueprint. The target repo is the
+ * one the Minion is installed in, auto-detected inside the command.
  */
-import { BLUEPRINT_NODES } from "./blueprint.js";
+import { runCommand } from "./cli/run.js";
 
-function main(): void {
-  const nodes = BLUEPRINT_NODES.map((n) => n.node).join(" → ");
-  console.log(`minion: ${BLUEPRINT_NODES.length} blueprint nodes`);
-  console.log(nodes);
+async function main(): Promise<void> {
+  const [command, ...rest] = process.argv.slice(2);
+
+  switch (command) {
+    case "run":
+      await runCommand(rest);
+      return;
+    default:
+      console.error(
+        [
+          "minion — unsupervised orchestrator of coding agents",
+          "",
+          "usage:",
+          '  minion run "<task>"        run a task through the worker blueprint',
+          "  minion run <spec>.md        decompose a spec via the roadmap layer (coming soon)",
+          "  minion run --issue <n>      resolve a GitHub issue (coming soon)",
+          "",
+          "flags:",
+          "  --pr    push the branch and open a real PR (default: dry-run, no push)",
+        ].join("\n"),
+      );
+      process.exitCode = command === undefined ? 0 : 1;
+  }
 }
 
-main();
+main().catch((err: unknown) => {
+  console.error(err instanceof Error ? err.stack ?? err.message : err);
+  process.exit(1);
+});

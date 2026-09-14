@@ -148,6 +148,10 @@ export function createWorkerHandlers(deps: WorkerDeps): NodeHandlers {
 
     sync: async ({ run }) => {
       const base = deps.config.repo.defaultBranch;
+      // Commit the accepted implementation first, so the branch carries a real
+      // diff for the PR and the rebase can detect genuine conflicts (FR13).
+      const message = run.plan?.summary ?? run.workItem;
+      await deps.repo.commitAll(run.cloneDir, `${message}\n\nMinion run ${run.id}`);
       const first = await deps.repo.rebaseOntoBase(run.cloneDir, base);
       if (first.ok) return { kind: "ok", summary: `rebased onto ${base}` };
       if (!first.conflict) return { kind: "fail", reason: `rebase failed: ${trunc(first.output)}` };
