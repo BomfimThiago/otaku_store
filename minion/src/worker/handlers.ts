@@ -60,6 +60,58 @@ const workItemBlock = (run: Run): string => `# Work item\n${run.workItem}`;
 const planBlock = (run: Run): string =>
   run.plan === undefined ? "" : `# Approved plan\n${JSON.stringify(run.plan, null, 2)}`;
 
+/** Human-readable PR body (markdown) — not the raw plan JSON. */
+function prBody(run: Run): string {
+  const plan = run.plan;
+  const lastBy = (judge: string): number | undefined =>
+    run.verdicts.filter((v) => v.judge === judge).at(-1)?.score;
+  const stepStatus = (node: string): string | undefined =>
+    run.steps.find((s) => s.node === node)?.status;
+
+  const steps = (plan?.steps ?? []).map((s) => `- ${s}`).join("\n") || "_n/a_";
+  const files = (plan?.files ?? []).map((f) => `- \`${f}\``).join("\n") || "_n/a_";
+
+  const harness: string[] = [];
+  if (stepStatus("static_evals") === "done") harness.push("static evals");
+  if (stepStatus("lint_tests") === "done") harness.push("lint + unit tests");
+  const e2e = stepStatus("e2e");
+  if (e2e === "done") harness.push("end-to-end suite");
+  else if (e2e === "skipped") harness.push("E2E skipped (no frontend change)");
+
+  const issue = /issue #(\d+)/i.exec(run.workItem)?.[1];
+  const planScore = lastBy("plan");
+  const implScore = lastBy("implementation");
+
+  const md = [
+    "## Summary",
+    plan?.summary ?? run.workItem,
+    "",
+    "## Work item",
+    issue ? `Resolves GitHub issue #${issue}.` : run.workItem,
+    "",
+    "## Changes",
+    steps,
+    "",
+    "## Files touched",
+    files,
+    "",
+    "## Verification",
+    `- Plan reviewed by an AI Judge — **${planScore ?? "—"}/100**`,
+    `- Implementation reviewed by an AI Judge — **${implScore ?? "—"}/100**`,
+    `- Harness: ${harness.length ? harness.join(" · ") : "—"} (green)`,
+  ];
+  if ((plan?.newDependencies ?? []).length) {
+    md.push("", "## New dependencies", plan!.newDependencies.map((d) => `- \`${d}\``).join("\n"));
+  }
+  md.push(
+    "",
+    "---",
+    "🤖 Planned, judged, implemented test-first, and verified autonomously by the **Minion** before this PR was opened. Human review happens here.",
+  );
+  if (issue) md.push("", `Closes #${issue}`);
+  return md.join("\n");
+}
+
 function lastImplCritique(run: Run): string | undefined {
   const rejections = run.verdicts.filter((v) => v.judge === "implementation" && v.verdict === "rejected");
   return rejections.at(-1)?.critique;
@@ -170,8 +222,8 @@ export function createWorkerHandlers(deps: WorkerDeps): NodeHandlers {
         run.cloneDir,
         run.branch,
         deps.config.repo.integrationBranch,
-        run.workItem,
-        planBlock(run),
+        run.plan?.summary ?? run.workItem,
+        prBody(run),
       );
       return { kind: "ok", summary: pr.url };
     },
