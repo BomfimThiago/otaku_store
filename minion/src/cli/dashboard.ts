@@ -11,6 +11,7 @@ import { startDashboard } from "../dashboard/server.js";
 
 export async function dashboardCommand(argv: string[]): Promise<void> {
   const port = parsePort(argv);
+  const enableTrigger = argv.includes("--enable-trigger");
   const repoRoot = await detectRepoRoot();
   const projectDir = path.join(repoRoot, "minion");
 
@@ -18,10 +19,13 @@ export async function dashboardCommand(argv: string[]): Promise<void> {
     runsDir: path.join(projectDir, "runs"),
     htmlPath: path.join(projectDir, "minion-console.html"),
     port,
+    // Only wire the live trigger when explicitly asked (e.g. behind a tunnel for a demo).
+    projectDir: enableTrigger ? projectDir : undefined,
   });
 
   console.log(`minion dashboard → ${dash.url}`);
   console.log(`reading runs from ${path.join(projectDir, "runs")}`);
+  if (enableTrigger) console.log("live trigger: ON (POST /api/trigger → minion run --issue N)");
   console.log("Ctrl-C to stop.\n");
 
   const stop = (): void => {

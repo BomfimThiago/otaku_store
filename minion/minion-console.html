@@ -302,6 +302,20 @@
   footer.note{ margin-top:22px; font-size:0.78rem; color:var(--dim); font-style:italic; }
   .empty{ padding:60px 20px; text-align:center; color:var(--dim); }
   .empty code{ color:var(--accent); }
+
+  .trigger{ margin-bottom:22px; }
+  .trigger label{ display:block; font-size:0.8rem; color:var(--dim); margin-bottom:8px; }
+  .trigger-row{ display:flex; align-items:center; gap:6px; }
+  .trigger-row .hash{ color:var(--accent); font-weight:700; }
+  .trigger input{ flex:1; min-width:0; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.14);
+    color:inherit; border-radius:8px; padding:8px 10px; font:inherit; }
+  .trigger input:focus{ outline:none; border-color:var(--accent); }
+  .trigger button{ background:var(--accent); color:#04121a; border:0; border-radius:8px; padding:8px 14px;
+    font:inherit; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .trigger button:disabled{ opacity:0.5; cursor:default; }
+  .trigger-msg{ margin-top:8px; font-size:0.78rem; min-height:1em; color:var(--dim); }
+  .trigger-msg.ok{ color:var(--accent); }
+  .trigger-msg.err{ color:#ff6b81; }
 </style>
 
 <div class="app">
@@ -311,6 +325,17 @@
   </div>
 
   <aside class="sidebar">
+    <div class="eyebrow">Pedir ao Minion</div>
+    <form id="triggerform" class="trigger">
+      <label for="issueinput">Implementar uma issue do GitHub</label>
+      <div class="trigger-row">
+        <span class="hash">#</span>
+        <input id="issueinput" type="number" min="1" step="1" placeholder="nº da issue" inputmode="numeric" />
+        <button id="triggerbtn" type="submit">Rodar</button>
+      </div>
+      <div id="triggermsg" class="trigger-msg"></div>
+    </form>
+
     <div class="eyebrow">Runs</div>
     <div id="runlist"></div>
   </aside>
@@ -539,8 +564,47 @@
       '<div class="empty">nenhum run ainda — rode <code>minion run "…"</code> em outro terminal</div>';
   }
 
+  function wireTrigger() {
+    const form = document.getElementById("triggerform");
+    const input = document.getElementById("issueinput");
+    const btn = document.getElementById("triggerbtn");
+    const msg = document.getElementById("triggermsg");
+    if (!form) return;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const issue = Number(input.value);
+      if (!Number.isInteger(issue) || issue <= 0) {
+        msg.className = "trigger-msg err"; msg.textContent = "digite um número de issue válido";
+        return;
+      }
+      btn.disabled = true; msg.className = "trigger-msg"; msg.textContent = "iniciando…";
+      try {
+        const r = await fetch("/api/trigger", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ issue }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) {
+          msg.className = "trigger-msg ok";
+          msg.textContent = data.message || `Minion iniciado na issue #${issue}`;
+          input.value = "";
+          await tick();
+        } else {
+          msg.className = "trigger-msg err";
+          msg.textContent = data.error || `erro (${r.status})`;
+        }
+      } catch (err) {
+        msg.className = "trigger-msg err"; msg.textContent = "falha de rede";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   async function boot() {
     try { blueprint = (await getJson("/api/blueprint")).nodes ?? []; } catch { blueprint = []; }
+    wireTrigger();
     await tick();
     setInterval(tick, 1000);
   }

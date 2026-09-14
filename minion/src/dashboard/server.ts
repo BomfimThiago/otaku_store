@@ -7,6 +7,7 @@
  * Node's built-in http only — no framework, no new dependency.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { spawn } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { BLUEPRINT_NODES } from "../blueprint.js";
@@ -17,7 +18,21 @@ export interface DashboardOptions {
   /** Path to the dashboard HTML shell. */
   htmlPath: string;
   port: number;
+  /**
+   * The `minion/` project dir. When set, the dashboard exposes POST /api/trigger
+   * to launch `minion run --issue N` from here — turning the read-only glass into
+   * a live "ask the Minion to work on a ticket" surface for demos. Omit to keep
+   * the dashboard strictly read-only.
+   */
+  projectDir?: string | undefined;
+  /** Hard cap on how many runs the public trigger may launch (abuse guard). */
+  maxTriggeredRuns?: number | undefined;
 }
+
+// One triggered run at a time; a per-process cap stops a public URL from
+// spawning unbounded agent builds. Deterministic guards, no LLM.
+let triggerActive = false;
+let triggeredCount = 0;
 
 export interface RunningDashboard {
   url: string;
@@ -61,6 +76,11 @@ async function handle(
     return;
   }
 
+  if (p === "/api/trigger") {
+    await handleTrigger(req, res, opts);
+    return;
+  }
+
   if (p === "/api/runs") {
     sendJson(res, 200, { runs: await listRuns(opts.runsDir) });
     return;
@@ -74,6 +94,82 @@ async function handle(
 
   res.writeHead(404, { "content-type": "text/plain" });
   res.end("not found");
+}
+
+/**
+ * POST /api/trigger { issue: number }  →  launches `minion run --issue N`.
+ * Guards: trigger must be enabled (projectDir set), method POST, a valid positive
+ * integer issue, only one active triggered run, and a per-process run cap.
+ */
+async function handleTrigger(
+  req: IncomingMessage,
+  res: ServerResponse,
+  opts: DashboardOptions,
+): Promise<void> {
+  if (!opts.projectDir) {
+    sendJson(res, 404, { error: "trigger disabled" });
+    return;
+  }
+  if (req.method !== "POST") {
+    sendJson(res, 405, { error: "use POST" });
+    return;
+  }
+  const cap = opts.maxTriggeredRuns ?? 25;
+  if (triggerActive) {
+    sendJson(res, 409, { error: "um run já está em andamento — aguarde ele terminar" });
+    return;
+  }
+  if (triggeredCount >= cap) {
+    sendJson(res, 429, { error: `limite de ${cap} runs desta sessão atingido` });
+    return;
+  }
+
+  let body: { issue?: unknown };
+  try {
+    body = JSON.parse(await readBody(req)) as { issue?: unknown };
+  } catch {
+    sendJson(res, 400, { error: "corpo inválido (JSON esperado)" });
+    return;
+  }
+  const issue = Number(body.issue);
+  if (!Number.isInteger(issue) || issue <= 0) {
+    sendJson(res, 400, { error: "informe o número da issue (inteiro positivo)" });
+    return;
+  }
+
+  triggerActive = true;
+  triggeredCount += 1;
+  const child = spawn("npx", ["tsx", "src/index.ts", "run", "--issue", String(issue), "--pr"], {
+    cwd: opts.projectDir,
+    env: process.env,
+    stdio: "ignore",
+  });
+  child.on("exit", () => {
+    triggerActive = false;
+  });
+  child.on("error", () => {
+    triggerActive = false;
+  });
+
+  sendJson(res, 202, {
+    ok: true,
+    issue,
+    message: `Minion iniciado na issue #${issue} — acompanhe o run abaixo`,
+    remaining: cap - triggeredCount,
+  });
+}
+
+/** Read a request body with a small size cap (trigger payloads are tiny). */
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk) => {
+      data += chunk;
+      if (data.length > 4096) reject(new Error("body too large"));
+    });
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
 }
 
 /** All runs, newest first. Missing dir or unreadable files degrade to []. */

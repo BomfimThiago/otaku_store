@@ -1,6 +1,7 @@
 {
   "repo": {
-    "defaultBranch": "main",
+    "source": "git@github.com:BomfimThiago/otaku_store.git",
+    "defaultBranch": "develop",
     "integrationBranch": "develop"
   },
   "parallelism": 1,
