@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addToCart,
   ApiError,
+  createReview,
   getCart,
   getProduct,
   listProducts,
+  listReviews,
   login,
   logout,
   me,
@@ -208,5 +210,41 @@ describe('api client', () => {
     expect(url).toBe('/api/auth/me');
     expect(init?.method ?? 'GET').toBe('GET');
     expect(init?.credentials).toBe('include');
+  });
+
+  it('lists reviews for a product, encoding the slug', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(jsonResponse({ reviews: [], average: 0, count: 0 }));
+
+    await listReviews('a b');
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/products/a%20b/reviews');
+    expect(init?.method ?? 'GET').toBe('GET');
+    expect(init?.credentials).toBe('include');
+  });
+
+  it('creates a review for a product', async () => {
+    const fetchMock = vi.mocked(fetch);
+    const review = {
+      id: 'r1',
+      productSlug: 'katana-x',
+      userId: 'u1',
+      userName: 'Ada',
+      rating: 5,
+      comment: 'Ótimo!',
+      createdAt: '2024-01-01T00:00:00.000Z',
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(review, { status: 201 }));
+
+    const input = { rating: 5, comment: 'Ótimo!' };
+    await expect(createReview('katana-x', input)).resolves.toEqual(review);
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/products/katana-x/reviews');
+    expect(init?.method).toBe('POST');
+    expect(init?.credentials).toBe('include');
+    expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json' });
+    expect(init?.body).toBe(JSON.stringify(input));
   });
 });
