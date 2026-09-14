@@ -1,0 +1,25 @@
+# Render Blueprint — deploys the OtakuVerso store as a single Node web service
+# (Fastify serves the REST API + the built React SPA). In-memory data, no DB.
+#
+# Deploy: on https://dashboard.render.com → New → Blueprint → connect this repo.
+# Render reads this file, builds and starts the service, and gives a public URL.
+services:
+  - type: web
+    name: otakuverso
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    # --include=dev keeps vite (build) + tsx (runtime) available; Render reuses
+    # the build filesystem at runtime, so tsx stays installed for the start step.
+    buildCommand: "cd store && npm install --include=dev && npm run build"
+    startCommand: "cd store && npm start"
+    healthCheckPath: /api/products
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      # Signs the auth session cookie. Render generates a strong value once.
+      - key: COOKIE_SECRET
+        generateValue: true
