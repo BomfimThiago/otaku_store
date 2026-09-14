@@ -4,13 +4,7 @@ export default defineConfig({
   test: {
     passWithNoTests: true,
     projects: [
-      {
-        test: {
-          name: 'api',
-          root: './api',
-          include: ['src/**/*.test.ts'],
-        },
-      },
+      './api/vitest.config.ts',
       {
         test: {
           name: 'web',
