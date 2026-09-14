@@ -46,9 +46,10 @@ set -a; . "$APP_DIR/.env"; set +a
 : "${GITHUB_TOKEN:?set GITHUB_TOKEN in .env}"
 : "${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in .env}"
 
-echo "==> 4/8 gh auth (so https clone + push work non-interactively)"
-echo "$GITHUB_TOKEN" | gh auth login --with-token
-gh auth setup-git
+echo "==> 4/8 git credential helper (https clone + push via GITHUB_TOKEN)"
+# Don't `gh auth login` — it errors when GITHUB_TOKEN is already in the env. gh
+# (and `gh pr create`) read GITHUB_TOKEN directly; git just needs a helper.
+git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GITHUB_TOKEN}"; }; f'
 
 echo "==> 5/8 drop the Playwright MCP (heavy browser download; only used in E2E recovery)"
 python3 - "$APP_DIR/.mcp.json" <<'PY' || true
