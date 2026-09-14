@@ -208,18 +208,24 @@ async function handleKill(
     sendJson(res, 401, { error: "token de acesso inválido ou ausente" });
     return;
   }
-  if (!activeChild || activeChild.pid === undefined) {
-    sendJson(res, 404, { error: "nenhum run em andamento" });
-    return;
+  // Kill the tracked child's group if we have it...
+  if (activeChild?.pid !== undefined) {
+    try {
+      process.kill(-activeChild.pid, "SIGKILL"); // negative pid = the whole group
+    } catch {
+      /* already gone */
+    }
   }
-  try {
-    process.kill(-activeChild.pid, "SIGKILL"); // negative pid = the whole group
-  } catch {
-    /* already gone */
-  }
+  // ...and, as a fallback, any lingering triggered-run process (orphaned by a
+  // restart, or otherwise untracked). pkill matches `run`, never `dashboard`.
+  await new Promise<void>((resolve) => {
+    const pk = spawn("pkill", ["-9", "-f", "src/index.ts run"]);
+    pk.on("close", () => resolve());
+    pk.on("error", () => resolve());
+  });
   triggerActive = false;
   activeChild = null;
-  sendJson(res, 202, { ok: true, message: "run interrompido" });
+  sendJson(res, 202, { ok: true, message: "run(s) interrompido(s)" });
 }
 
 /** Read a request body with a small size cap (trigger payloads are tiny). */
